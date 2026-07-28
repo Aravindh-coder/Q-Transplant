@@ -142,7 +142,7 @@ class EmailService:
     def send_approval_status(cls, email: str, name: str, approved: bool, reason: str = ""):
         status_text = "APPROVED" if approved else "REJECTED"
         color = "#24a148" if approved else "#da1e28"
-        subject = f"Q-Transplant Account Status Update: {status_text}"
+        subject = f"Q-Transplant Account Status Update: {status_text} ({name})"
         body = f"""
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #f4f4f4; background-color: #161616;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #262626; border-top: 4px solid {color}; padding: 30px;">
@@ -150,13 +150,16 @@ class EmailService:
                 <p>Hello <strong>{name}</strong>,</p>
                 <p>Your registration request has been officially <strong>{status_text}</strong> by the Transplant Coordination Board.</p>
                 {f'<p style="background:#161616; padding:10px; border-left: 3px solid {color};"><strong>Note:</strong> {reason}</p>' if reason else ''}
-                {f'<p><a href="http://localhost:5173" style="background:#0f62fe; color:#fff; padding:10px 20px; text-decoration:none; display:inline-block; margin-top:10px;">Log In to Portal</a></p>' if approved else ''}
+                {f'<p><a href="http://localhost:5174" style="background:#0f62fe; color:#fff; padding:10px 20px; text-decoration:none; display:inline-block; margin-top:10px;">Log In to Portal</a></p>' if approved else ''}
                 <hr style="border: none; border-top: 1px solid #393939; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #8d8d8d;">Q-Transplant Security & Compliance</p>
+                <p style="font-size: 12px; color: #8d8d8d;">Q-Transplant Security & Compliance · Admin Notice Sent to {settings.ORGANIZER_EMAIL}</p>
             </div>
         </div>
         """
-        return cls.send_email(email, subject, body)
+        cls.send_email(email, subject, body)
+        if email != settings.ORGANIZER_EMAIL:
+            cls.send_email(settings.ORGANIZER_EMAIL, f"[ORGANIZER CONFIRMATION] {subject}", body)
+        return True
 
     @classmethod
     def send_match_notification(cls, email: str, recipient_name: str, organ_type: str, match_score: float):

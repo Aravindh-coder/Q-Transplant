@@ -14,6 +14,8 @@ import { renderDashboardHospital } from './pages/DashboardHospital.js';
 import { renderDashboardDonor } from './pages/DashboardDonor.js';
 import { renderDashboardPatient } from './pages/DashboardPatient.js';
 
+import { renderTelemetryGauge } from './components/TelemetryGauge.js';
+
 let wsConnection = null;
 
 function initWebSocket() {
@@ -100,7 +102,156 @@ function renderApp() {
 
 function renderActiveTab() {
   const role = state.currentUser ? state.currentUser.role : 'organizer';
+  const tab = state.activeTab || 'dashboard';
 
+  if (tab === 'approvals') {
+    const pending = state.pendingUsers || [];
+    return `
+      <div>
+        <h1 class="dash-title" style="margin-bottom:1rem;"><i class="fa-solid fa-user-check" style="color:#0f62fe;margin-right:8px;"></i>Pending User Approvals</h1>
+        <div class="ultra-table-wrap">
+          <div class="ultra-table-header">
+            <div class="ultra-table-title">Registrations Awaiting Review (${pending.length})</div>
+          </div>
+          ${pending.length === 0 ? `
+            <div style="padding: 2rem; text-align: center; color: var(--cds-text-02);">
+              <i class="fa-solid fa-check-circle" style="font-size: 2rem; color: #42be65; margin-bottom: 8px; display: block;"></i>
+              No pending registrations! All accounts are approved.
+            </div>
+          ` : `
+            <table class="utbl">
+              <thead>
+                <tr><th>Applicant</th><th>Role</th><th>Email</th><th>Date</th><th style="text-align:right;">Action</th></tr>
+              </thead>
+              <tbody>
+                ${pending.map(u => `
+                  <tr>
+                    <td><strong>${u.full_name}</strong></td>
+                    <td><span class="bx--tag bx--tag--yellow">${u.role.toUpperCase()}</span></td>
+                    <td>${u.email}</td>
+                    <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Recent'}</td>
+                    <td style="text-align:right;">
+                      <button class="bx--btn bx--btn--primary btn-approve-user" data-id="${u.id}" style="padding:6px 12px; font-size:12px; border-radius:4px;">
+                        <i class="fa-solid fa-check"></i> Approve
+                      </button>
+                      <button class="bx--btn bx--btn--secondary btn-reject-user" data-id="${u.id}" style="padding:6px 12px; font-size:12px; border-radius:4px; background:#da1e28;">
+                        <i class="fa-solid fa-xmark"></i> Reject
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  if (tab === 'audit') {
+    const logs = state.auditLogs || [];
+    return `
+      <div>
+        <h1 class="dash-title" style="margin-bottom:1rem;"><i class="fa-solid fa-shield-halved" style="color:#0f62fe;margin-right:8px;"></i>System Audit Trail Logs</h1>
+        <div class="ultra-table-wrap">
+          <table class="utbl">
+            <thead>
+              <tr><th>Timestamp</th><th>Action</th><th>Resource</th><th>Event Details</th></tr>
+            </thead>
+            <tbody>
+              ${logs.map(l => `
+                <tr>
+                  <td style="font-family: var(--cds-mono-font); font-size:11px;">${new Date(l.timestamp).toLocaleString()}</td>
+                  <td><span class="bx--tag bx--tag--blue">${l.action}</span></td>
+                  <td>${l.resource}</td>
+                  <td>${l.details}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  if (tab === 'organs') {
+    const organs = state.organs || [];
+    return `
+      <div>
+        <h1 class="dash-title" style="margin-bottom:1rem;"><i class="fa-solid fa-boxes-packing" style="color:#0f62fe;margin-right:8px;"></i>Organ Donation Registry</h1>
+        <div class="ultra-table-wrap">
+          <table class="utbl">
+            <thead>
+              <tr><th>Cold Box ID</th><th>Organ Type</th><th>Blood Group</th><th>HLA Markers</th><th>Max Ischemia</th><th>Status</th><th>Grover Match</th></tr>
+            </thead>
+            <tbody>
+              ${organs.map(o => `
+                <tr>
+                  <td style="font-family:var(--cds-mono-font);">${o.cold_box_id}</td>
+                  <td><strong>${o.organ_type}</strong></td>
+                  <td><span class="bx--tag bx--tag--red">${o.blood_type}</span></td>
+                  <td>${o.hla_type}</td>
+                  <td>${o.max_ischemia_hours} Hours</td>
+                  <td><span class="bx--tag bx--tag--green">${o.status.toUpperCase()}</span></td>
+                  <td>
+                    <button class="bx--btn bx--btn--primary btn-compute-quantum-match" data-id="${o.id}" style="padding:6px 12px; font-size:12px; border-radius:4px;">
+                      <i class="fa-solid fa-atom"></i> Run Grover Search
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  if (tab === 'matching') {
+    const matches = state.matches || [];
+    return `
+      <div>
+        <h1 class="dash-title" style="margin-bottom:1rem;"><i class="fa-solid fa-dna" style="color:#8a3ffc;margin-right:8px;"></i>Grover's Quantum Match Engine</h1>
+        <div class="ultra-table-wrap">
+          <div class="ultra-table-header">
+            <div class="ultra-table-title">Computed Compatibility Matches (${matches.length})</div>
+          </div>
+          <table class="utbl">
+            <thead>
+              <tr><th>Match ID</th><th>Organ ID</th><th>Patient ID</th><th>Score</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              ${matches.map(m => `
+                <tr>
+                  <td>#MATCH-${m.id}</td>
+                  <td>#ORGAN-${m.organ_id}</td>
+                  <td>#PATIENT-${m.patient_id}</td>
+                  <td><strong style="color:#42be65;">${m.compatibility_score.toFixed(1)}%</strong></td>
+                  <td><span class="bx--tag bx--tag--green">${m.status ? m.status.toUpperCase() : 'COMPUTED'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  if (tab === 'telemetry') {
+    const telemetry = state.telemetry;
+    return `
+      <div>
+        <h1 class="dash-title" style="margin-bottom:1rem;"><i class="fa-solid fa-microchip" style="color:#00f0ff;margin-right:8px;"></i>Cold-Box Real-Time Telemetry & GPS Tracker</h1>
+        ${renderTelemetryGauge(telemetry)}
+        <div style="margin-top:1.5rem;">
+          <h3 style="font-size:14px; font-weight:600; color:#f4f4f4; margin-bottom:0.75rem;"><i class="fa-solid fa-location-dot" style="color:#da1e28;"></i> Real-Time Transport GPS Container Map</h3>
+          <div id="leaflet-map" style="height:420px; border-radius:8px;"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Default / 'dashboard'
   switch (role) {
     case 'doctor':
       return renderDashboardDoctor();
@@ -292,12 +443,12 @@ function attachGlobalEvents() {
 
   const refreshBtn = document.getElementById('btn-refresh-data');
   if (refreshBtn) {
-    refreshBtn.onclick = () => loadSystemData();
+    refreshBtn.onclick = () => loadSystemData(true);
   }
 
   const adminRefreshBtn = document.getElementById('btn-refresh-admin-data');
   if (adminRefreshBtn) {
-    adminRefreshBtn.onclick = () => loadSystemData();
+    adminRefreshBtn.onclick = () => loadSystemData(true);
   }
 
   // Admin section view tabs
@@ -480,7 +631,7 @@ function attachGlobalEvents() {
   });
 }
 
-async function loadSystemData() {
+async function loadSystemData(showToast = false) {
   try {
     if (state.currentUser && state.currentUser.role === 'organizer') {
       const pending = await ApiService.getPendingApprovals();
@@ -499,6 +650,9 @@ async function loadSystemData() {
     const telemetry = await ApiService.getLatestTelemetry('BOX-ESP32-001');
     if (telemetry) {
       state.telemetry = telemetry;
+    }
+    if (showToast) {
+      ToastManager.show('System data refreshed live from server!', 'success');
     }
   } catch (err) {
     console.error('Error fetching operational data:', err);
