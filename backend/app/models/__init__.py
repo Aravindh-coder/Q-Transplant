@@ -3,7 +3,8 @@ from backend.app.models.domain import (
     User, UserRole, Hospital, Doctor, Donor, Patient,
     Organ, OrganStatus, Match, MatchStatus, Ambulance,
     Transport, GPSLocation, Notification, AuditLog,
-    Session, Approval
+    Session, Approval, PasswordReset, ICUOccupancy,
+    BloodInventory, OperationTheatre
 )
 
 __all__ = [
@@ -24,5 +25,9 @@ __all__ = [
     "Notification",
     "AuditLog",
     "Session",
-    "Approval"
+    "Approval",
+    "PasswordReset",
+    "ICUOccupancy",
+    "BloodInventory",
+    "OperationTheatre"
 ]

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qtransplant-postgres
+spec:
+  serviceName: "postgres"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qtransplant-postgres
+  template:
+    metadata:
+      labels:
+        app: qtransplant-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_USER
+          value: "qtransplant"
+        - name: POSTGRES_PASSWORD
+          value: "SecretPostgresPassword2026!"
+        - name: POSTGRES_DB
+          value: "qtransplant_db"
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: qtransplant-postgres

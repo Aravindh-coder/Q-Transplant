@@ -52,6 +52,7 @@ class User(Base):
     patient = relationship("Patient", back_populates="user", uselist=False)
     notifications = relationship("Notification", back_populates="user")
     audit_logs = relationship("AuditLog", back_populates="user")
+    reset_tokens = relationship("PasswordReset", back_populates="user")
 
 
 class Hospital(Base):
@@ -72,6 +73,9 @@ class Hospital(Base):
     user = relationship("User", back_populates="hospital")
     doctors = relationship("Doctor", back_populates="hospital")
     ambulances = relationship("Ambulance", back_populates="hospital")
+    icu_occupancy = relationship("ICUOccupancy", back_populates="hospital", uselist=False)
+    blood_inventory = relationship("BloodInventory", back_populates="hospital")
+    operation_theatres = relationship("OperationTheatre", back_populates="hospital")
 
 
 class Doctor(Base):
@@ -84,6 +88,8 @@ class Doctor(Base):
     specialization = Column(String(100), nullable=False)
     department = Column(String(100), nullable=False)
     phone = Column(String(50), nullable=False)
+    avatar_url = Column(String(255), nullable=True)
+    certificate_url = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="doctor")
@@ -104,6 +110,7 @@ class Donor(Base):
     gender = Column(String(20), nullable=False)
     medical_history = Column(Text, nullable=True)
     status = Column(String(50), default="registered")
+    qr_code_token = Column(String(100), unique=True, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="donor")
@@ -121,7 +128,7 @@ class Patient(Base):
     blood_type = Column(String(10), nullable=False)
     hla_type = Column(String(100), nullable=False)
     target_organ = Column(String(50), nullable=False)
-    urgency_score = Column(Integer, default=5, nullable=False)  # 1 to 10 scale
+    urgency_score = Column(Integer, default=5, nullable=False)
     status = Column(String(50), default="waiting_list")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -135,7 +142,7 @@ class Organ(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     donor_id = Column(Integer, ForeignKey("donors.id"), nullable=False)
-    organ_type = Column(String(50), nullable=False)  # Heart, Kidney, Liver, Lung, Pancreas
+    organ_type = Column(String(50), nullable=False)
     blood_type = Column(String(10), nullable=False)
     hla_type = Column(String(100), nullable=False)
     max_ischemia_hours = Column(Float, default=6.0)
@@ -154,9 +161,10 @@ class Match(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     organ_id = Column(Integer, ForeignKey("organs.id"), nullable=False)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    compatibility_score = Column(Float, nullable=False)  # Percentage e.g. 94.5
+    compatibility_score = Column(Float, nullable=False)
     distance_km = Column(Float, default=15.0)
     status = Column(String(50), default=MatchStatus.PENDING.value)
+    match_rationale = Column(Text, nullable=True)
     matched_at = Column(DateTime, default=datetime.datetime.utcnow)
     approved_at = Column(DateTime, nullable=True)
 
@@ -260,10 +268,61 @@ class Approval(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    target_entity = Column(String(100), nullable=False)  # User, Match, Doctor, Hospital
+    target_entity = Column(String(100), nullable=False)
     target_id = Column(Integer, nullable=False)
     requested_by = Column(String(255), nullable=False)
     approved_by = Column(String(255), nullable=True)
-    status = Column(String(50), default="pending")  # pending, approved, rejected
+    status = Column(String(50), default="pending")
     comments = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="reset_tokens")
+
+
+class ICUOccupancy(Base):
+    __tablename__ = "icu_occupancies"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), unique=True, nullable=False)
+    total_beds = Column(Integer, default=20, nullable=False)
+    occupied_beds = Column(Integer, default=14, nullable=False)
+    ventilators_available = Column(Integer, default=6, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    hospital = relationship("Hospital", back_populates="icu_occupancy")
+
+
+class BloodInventory(Base):
+    __tablename__ = "blood_inventories"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    blood_type = Column(String(10), nullable=False)
+    units_available = Column(Integer, default=10, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    hospital = relationship("Hospital", back_populates="blood_inventory")
+
+
+class OperationTheatre(Base):
+    __tablename__ = "operation_theatres"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    status = Column(String(50), default="available")  # available, occupied, maintenance
+    current_procedure = Column(String(255), nullable=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    hospital = relationship("Hospital", back_populates="operation_theatres")

@@ -7,14 +7,14 @@ from backend.app.core.email import EmailService
 from backend.app.repositories.organ_repo import OrganRepository
 from backend.app.repositories.audit_repo import AuditRepository
 from backend.app.repositories.user_repo import UserRepository
-from backend.app.services.matching_service import MatchingService
+from backend.app.services.quantum_matching import QuantumMatchingEngine
 from backend.app.schemas.domain import MatchOut
 
-router = APIRouter(prefix="/matches", tags=["Matching & Allocation Engine"])
+router = APIRouter(prefix="/matches", tags=["Quantum-Inspired Matching & Allocation Engine"])
 
 
 @router.post("/compute/{organ_id}", response_model=List[MatchOut])
-def compute_organ_matches(
+def compute_quantum_organ_matches(
     organ_id: int,
     db: Session = Depends(get_db),
     current_token: dict = Depends(RoleChecker(["organizer", "doctor"]))
@@ -31,17 +31,22 @@ def compute_organ_matches(
     created_matches = []
 
     for patient in patients:
-        score = MatchingService.compute_match_score(organ, patient)
-        if score > 30.0:  # Threshold for valid candidate match
+        # Run Quantum-Inspired Multi-Factor Optimization
+        quantum_res = QuantumMatchingEngine.compute_quantum_match(organ, patient, distance_km=18.5, icu_capacity_percent=85.0)
+        score = quantum_res["confidence_score"]
+
+        if quantum_res["is_viable"]:
             match = organ_repo.create_match(
                 organ_id=organ.id,
                 patient_id=patient.id,
                 compatibility_score=score,
                 distance_km=18.5
             )
+            match.match_rationale = quantum_res["rationale"]
+            db.commit()
+            db.refresh(match)
             created_matches.append(match)
 
-            # Notify recipient doctor/patient
             patient_user = user_repo.get_by_id(patient.user_id)
             if patient_user:
                 EmailService.send_match_notification(
@@ -54,9 +59,9 @@ def compute_organ_matches(
     user_id = int(current_token.get("sub"))
     audit.log_action(
         user_id=user_id,
-        action="COMPUTE_MATCH",
+        action="QUANTUM_MATCH_COMPUTE",
         resource="Match",
-        details=f"Computed {len(created_matches)} candidates for organ {organ.organ_type} (ID: {organ.id})"
+        details=f"Computed {len(created_matches)} quantum candidates for organ {organ.organ_type} (ID: {organ.id})"
     )
 
     return created_matches

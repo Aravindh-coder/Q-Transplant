@@ -3,8 +3,35 @@ import { ApiService } from './services/api.js';
 import { renderNavbar } from './components/Navbar.js';
 import { renderSidebar } from './components/Sidebar.js';
 import { initLiveMap } from './components/LiveMap.js';
+import { CameraModal } from './components/CameraModal.js';
+import { attachAIAssistantEvents } from './components/AIAssistant.js';
+import { ToastManager } from './components/Toast.js';
 import { renderLoginView } from './pages/Login.js';
 import { renderDashboardAdmin } from './pages/DashboardAdmin.js';
+import { renderDashboardDoctor } from './pages/DashboardDoctor.js';
+import { renderDashboardHospital } from './pages/DashboardHospital.js';
+import { renderDashboardDonor } from './pages/DashboardDonor.js';
+import { renderDashboardPatient } from './pages/DashboardPatient.js';
+
+let wsConnection = null;
+
+function initWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/api/v1/ws`;
+  try {
+    wsConnection = new WebSocket(wsUrl);
+    wsConnection.onopen = () => console.log('WebSocket connected to Q-Transplant Server');
+    wsConnection.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'TELEMETRY') {
+        state.telemetry = data.payload;
+        subscribe.notifyStateChange();
+      }
+    };
+  } catch (err) {
+    console.warn('WebSocket connection fallback to polling:', err);
+  }
+}
 
 function renderApp() {
   const root = document.getElementById('app');
@@ -26,17 +53,26 @@ function renderApp() {
 
   attachGlobalEvents();
 
-  if (state.activeTab === 'dashboard') {
+  if (state.activeTab === 'dashboard' || state.activeTab === 'telemetry') {
     initLiveMap(state.telemetry.lat, state.telemetry.lng);
   }
+
+  attachAIAssistantEvents();
 }
 
 function renderActiveTab() {
-  switch (state.activeTab) {
-    case 'dashboard':
-      return renderDashboardAdmin();
-    case 'approvals':
-      return renderDashboardAdmin();
+  const role = state.currentUser ? state.currentUser.role : 'organizer';
+
+  switch (role) {
+    case 'doctor':
+      return renderDashboardDoctor();
+    case 'hospital':
+      return renderDashboardHospital();
+    case 'donor':
+      return renderDashboardDonor();
+    case 'patient':
+      return renderDashboardPatient();
+    case 'organizer':
     default:
       return renderDashboardAdmin();
   }
@@ -48,6 +84,27 @@ function attachAuthEvents() {
   const formLogin = document.getElementById('form-login');
   const formReg = document.getElementById('form-register');
   const errBox = document.getElementById('auth-error-msg');
+  const cameraBtn = document.getElementById('btn-start-camera');
+  const cameraInput = document.getElementById('reg-camera-base64');
+  const avatarThumb = document.getElementById('avatar-preview-thumbnail');
+  const roleSelect = document.getElementById('reg-role');
+  const cameraSec = document.getElementById('doctor-camera-section');
+
+  if (roleSelect && cameraSec) {
+    roleSelect.onchange = () => {
+      cameraSec.style.display = roleSelect.value === 'doctor' ? 'block' : 'none';
+    };
+  }
+
+  if (cameraBtn) {
+    cameraBtn.onclick = () => {
+      CameraModal.startCamera((base64) => {
+        cameraInput.value = base64;
+        avatarThumb.src = base64;
+        ToastManager.show('Live camera snapshot captured!', 'success');
+      });
+    };
+  }
 
   if (tabLogin && tabReg) {
     tabLogin.onclick = () => {
@@ -81,6 +138,7 @@ function attachAuthEvents() {
           role: tokenData.role,
           is_approved: tokenData.is_approved
         });
+        ToastManager.show(`Welcome back, ${tokenData.full_name}!`, 'success');
         loadSystemData();
       } catch (err) {
         errBox.textContent = err.message || 'Authentication failed.';
@@ -93,16 +151,29 @@ function attachAuthEvents() {
     formReg.onsubmit = async (e) => {
       e.preventDefault();
       errBox.style.display = 'none';
-      const payload = {
-        email: document.getElementById('reg-email').value,
-        password: document.getElementById('reg-password').value,
-        full_name: document.getElementById('reg-name').value,
-        role: document.getElementById('reg-role').value
-      };
+      const role = document.getElementById('reg-role').value;
+      const email = document.getElementById('reg-email').value;
+      const pwd = document.getElementById('reg-password').value;
+      const name = document.getElementById('reg-name').value;
 
       try {
-        await ApiService.register(payload);
-        alert('Registration successful! Log in to your portal.');
+        if (role === 'doctor' && cameraInput.value) {
+          const formData = new FormData();
+          formData.append('email', email);
+          formData.append('password', pwd);
+          formData.append('full_name', name);
+          formData.append('phone', '080-555-0100');
+          formData.append('license_number', `MED-${Date.now().toString().slice(-4)}`);
+          formData.append('specialization', 'Transplant Surgery');
+          formData.append('department', 'Surgery');
+          formData.append('camera_image_base64', cameraInput.value);
+
+          await fetch('/api/v1/auth/register-doctor-camera', { method: 'POST', body: formData });
+        } else {
+          await ApiService.register({ email, password: pwd, full_name: name, role });
+        }
+
+        ToastManager.show('Registration successful! Submitted for admin approval.', 'success');
         tabLogin.click();
       } catch (err) {
         errBox.textContent = err.message || 'Registration failed.';
@@ -123,6 +194,7 @@ function attachGlobalEvents() {
     logoutBtn.onclick = () => {
       localStorage.removeItem('access_token');
       setCurrentUser(null);
+      ToastManager.show('Signed out cleanly.', 'info');
     };
   }
 
@@ -131,7 +203,6 @@ function attachGlobalEvents() {
     refreshBtn.onclick = () => loadSystemData();
   }
 
-  // Sidebar Tab Navigation
   document.querySelectorAll('.bx--side-nav__link').forEach(link => {
     link.onclick = (e) => {
       e.preventDefault();
@@ -140,12 +211,26 @@ function attachGlobalEvents() {
     };
   });
 
-  // Approval Buttons
   document.querySelectorAll('.btn-approve-user').forEach(btn => {
     btn.onclick = async () => {
       const id = parseInt(btn.getAttribute('data-id'));
       await ApiService.approveUser(id, true);
+      ToastManager.show('User approved successfully.', 'success');
       loadSystemData();
+    };
+  });
+
+  // Quantum Match Trigger Button
+  document.querySelectorAll('.btn-compute-quantum-match').forEach(btn => {
+    btn.onclick = async () => {
+      const organId = parseInt(btn.getAttribute('data-id'));
+      try {
+        const matches = await ApiService.computeMatches(organId);
+        ToastManager.show(`Computed ${matches.length} Quantum Matches!`, 'success');
+        loadSystemData();
+      } catch (err) {
+        ToastManager.show('Error computing matches: ' + err.message, 'error');
+      }
     };
   });
 }
@@ -161,6 +246,9 @@ async function loadSystemData() {
     const organs = await ApiService.getOrgans();
     state.organs = organs;
 
+    const matches = await ApiService.getMatches();
+    state.matches = matches;
+
     const telemetry = await ApiService.getLatestTelemetry('BOX-ESP32-001');
     if (telemetry) {
       state.telemetry = telemetry;
@@ -171,10 +259,10 @@ async function loadSystemData() {
   renderApp();
 }
 
-// Initial App Boot
 subscribe(renderApp);
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initWebSocket();
   const token = localStorage.getItem('access_token');
   if (token) {
     try {

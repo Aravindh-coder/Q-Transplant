@@ -1,10 +1,11 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.repositories.telemetry_repo import TelemetryRepository
 from backend.app.repositories.audit_repo import AuditRepository
 from backend.app.services.telemetry_service import TelemetryService
+from backend.app.services.ai_risk_service import AIRiskService
 from backend.app.schemas.domain import TelemetryPush, TelemetryOut
 
 router = APIRouter(prefix="/telemetry", tags=["ESP32 Cold-Box Telemetry & GPS Tracking"])
@@ -12,11 +13,9 @@ router = APIRouter(prefix="/telemetry", tags=["ESP32 Cold-Box Telemetry & GPS Tr
 
 @router.post("/push", response_model=TelemetryOut, status_code=status.HTTP_201_CREATED)
 def push_sensor_telemetry(payload: TelemetryPush, db: Session = Depends(get_db)):
-    """API endpoint called by ESP32 microcontrollers over WiFi/Cellular HTTP."""
     repo = TelemetryRepository(db)
     audit = AuditRepository(db)
 
-    # Evaluate temperature and battery threshold
     is_alarm, alarm_msg = TelemetryService.evaluate_cold_box(
         temp_celsius=payload.temp_celsius,
         battery_level=payload.battery_level
@@ -41,6 +40,26 @@ def push_sensor_telemetry(payload: TelemetryPush, db: Session = Depends(get_db))
         )
 
     return reading
+
+
+@router.post("/emergency-trigger")
+def trigger_cold_box_sos(cold_box_id: str = Form(...), reason: str = Form(...), db: Session = Depends(get_db)):
+    """Called when emergency SOS button is pressed on ESP32 cold box hardware."""
+    audit = AuditRepository(db)
+    audit.log_action(
+        user_id=None,
+        action="HARDWARE_SOS_TRIGGER",
+        resource="ESP32ColdBox",
+        details=f"EMERGENCY BUTTON PRESSED on box {cold_box_id}: {reason}"
+    )
+    return {"status": "EMERGENCY_DISPATCHED", "cold_box_id": cold_box_id, "message": "Emergency dispatch alerted"}
+
+
+@router.post("/ai-query")
+def ask_ai_assistant(query: str = Form(...)):
+    """Conversational query endpoint for integrated AI Transplant Assistant."""
+    answer = AIRiskService.answer_ai_query(query, {})
+    return {"query": query, "response": answer}
 
 
 @router.get("/{cold_box_id}/latest", response_model=TelemetryOut)

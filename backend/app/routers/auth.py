@@ -1,16 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import base64
+import os
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
+from backend.app.core.config import settings
 from backend.app.core.security import (
     get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, oauth2_scheme
 )
 from backend.app.core.email import EmailService
 from backend.app.repositories.user_repo import UserRepository
 from backend.app.repositories.audit_repo import AuditRepository
+from backend.app.models.domain import PasswordReset
 from backend.app.schemas.auth import UserRegister, UserLogin, Token, RefreshTokenRequest
 from backend.app.schemas.domain import UserOut
 
 router = APIRouter(prefix="/auth", tags=["Authentication & Access Control"])
+
+AVATARS_DIR = "backend/uploads/avatars"
+CERTIFICATES_DIR = "backend/uploads/certificates"
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -25,7 +35,6 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
             detail="User with this email address already exists."
         )
 
-    # Organizer / Admin accounts are auto-approved; others require review
     is_approved = True if payload.role.lower() == "organizer" else False
     
     hashed_pwd = get_password_hash(payload.password)
@@ -38,7 +47,6 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
         is_approved=is_approved
     )
 
-    # Create role specific profile
     if payload.role.lower() == "hospital":
         repo.create_hospital_profile(
             user_id=user.id,
@@ -80,6 +88,61 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
     return user
 
 
+@router.post("/register-doctor-camera", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+
+def register_doctor_camera(
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(...),
+    phone: str = Form(...),
+    license_number: str = Form(...),
+    specialization: str = Form(...),
+    department: str = Form(...),
+    camera_image_base64: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    repo = UserRepository(db)
+    audit = AuditRepository(db)
+
+    if repo.get_by_email(email):
+        raise HTTPException(status_code=400, detail="Doctor email address already registered.")
+
+    # Process and save live camera photo
+    filename = f"avatar_{uuid.uuid4().hex[:8]}.jpg"
+    filepath = os.path.join(AVATARS_DIR, filename)
+
+    try:
+        header, encoded = camera_image_base64.split(",", 1) if "," in camera_image_base64 else ("", camera_image_base64)
+        image_bytes = base64.b64decode(encoded)
+        with open(filepath, "wb") as f:
+            f.write(image_bytes)
+    except Exception as e:
+        filepath = f"/uploads/avatars/default_doctor.jpg"
+
+    user = repo.create_user(
+        email=email,
+        password_hash=get_password_hash(password),
+        full_name=full_name,
+        role="doctor",
+        phone=phone,
+        is_approved=False  # Requires Admin Approval
+    )
+
+    doc = repo.create_doctor_profile(
+        user_id=user.id,
+        medical_license=license_number,
+        specialization=specialization,
+        department=department,
+        phone=phone
+    )
+    doc.avatar_url = f"/uploads/avatars/{filename}"
+    db.commit()
+
+    audit.log_action(user_id=user.id, action="REGISTER_CAMERA", resource="Doctor", details=f"Saved camera capture: {filename}")
+    EmailService.send_registration_ack(user.email, user.full_name, "doctor")
+    return user
+
+
 @router.post("/login", response_model=Token)
 def login_user(payload: UserLogin, db: Session = Depends(get_db)):
     repo = UserRepository(db)
@@ -112,6 +175,55 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
         role=user.role,
         is_approved=user.is_approved
     )
+
+
+@router.post("/forgot-password")
+def request_password_reset(email: str = Form(...), db: Session = Depends(get_db)):
+    repo = UserRepository(db)
+    user = repo.get_by_email(email)
+    if not user:
+        # Prevent user enumeration
+        return {"message": "If the account exists, a password reset link has been dispatched to your email."}
+
+    reset_token = uuid.uuid4().hex
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+    pwd_reset = PasswordReset(
+        user_id=user.id,
+        token=reset_token,
+        expires_at=expires_at,
+        used=False
+    )
+    db.add(pwd_reset)
+    db.commit()
+
+    reset_link = f"http://localhost:5173/#reset-token={reset_token}"
+    body = f"""
+    <p>Hello <strong>{user.full_name}</strong>,</p>
+    <p>A password reset request was issued for your Q-Transplant account.</p>
+    <p>Click the secure link below to set a new password (valid for 15 minutes):</p>
+    <p><a href="{reset_link}">{reset_link}</a></p>
+    """
+    EmailService.send_email(user.email, "Q-Transplant Password Reset Link", body)
+    return {"message": "Password reset token generated and sent to registered email."}
+
+
+@router.post("/reset-password")
+def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
+    reset_entry = db.query(PasswordReset).filter(PasswordReset.token == token, PasswordReset.used == False).first()
+    if not reset_entry:
+        raise HTTPException(status_code=400, detail="Invalid or already used password reset token.")
+
+    if datetime.now(timezone.utc) > reset_entry.expires_at.replace(tzinfo=timezone.utc):
+        raise HTTPException(status_code=400, detail="Password reset token has expired.")
+
+    user = db.query(UserRepository(db).get_by_id(reset_entry.user_id))
+    user = db.query(PasswordReset).filter(PasswordReset.id == reset_entry.id).first().user
+    user.password_hash = get_password_hash(new_password)
+    reset_entry.used = True
+    db.commit()
+
+    return {"message": "Password successfully updated. You may now log in."}
 
 
 @router.post("/refresh", response_model=Token)
