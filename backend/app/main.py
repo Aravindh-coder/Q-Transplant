@@ -68,13 +68,13 @@ def seed_initial_data():
     """Seeds initial administrative organizer and sample operational data if missing."""
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.email == "admin@qtransplant.org").first()
+        admin = db.query(User).filter((User.email == "admin@qtransplant.org") | (User.email == "aravindhjoshua10@gmail.com")).first()
         if not admin:
             logger.info("Seeding default Administrator (Organizer)...")
             admin = User(
-                email="admin@qtransplant.org",
+                email="aravindhjoshua10@gmail.com",
                 password_hash=get_password_hash("AdminPass123!"),
-                full_name="Dr. Eleanor Vance (Chief Organizer)",
+                full_name="Aravindh Joshua (Organizer Admin)",
                 role=UserRole.ORGANIZER.value,
                 phone="080-9999-0000",
                 is_active=True,

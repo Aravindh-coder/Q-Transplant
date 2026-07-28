@@ -230,7 +230,7 @@ def request_password_reset(email: str = Form(...), db: Session = Depends(get_db)
     db.add(pwd_reset)
     db.commit()
 
-    reset_link = f"http://localhost:5173/#reset-token={reset_token}"
+    reset_link = f"http://localhost:5174/#reset-token={reset_token}"
     body = f"""
     <div style="font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #f4f4f4; background-color: #161616;">
         <div style="max-width: 550px; margin: 0 auto; background-color: #262626; border-top: 4px solid #0f62fe; padding: 30px;">

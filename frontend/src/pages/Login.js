@@ -19,7 +19,7 @@ export function renderLoginView() {
       <form id="form-login">
         <div style="margin-bottom: 1.25rem;">
           <label style="display: block; font-size: 12px; color: var(--cds-text-02); margin-bottom: 6px;">EMAIL ADDRESS</label>
-          <input type="email" id="login-email" required value="admin@qtransplant.org" style="width: 100%; padding: 10px; background: var(--cds-layer-02); border: 1px solid var(--cds-border-subtle); color: var(--cds-text-01);" />
+          <input type="email" id="login-email" required value="aravindhjoshua10@gmail.com" style="width: 100%; padding: 10px; background: var(--cds-layer-02); border: 1px solid var(--cds-border-subtle); color: var(--cds-text-01);" />
         </div>
 
         <div style="margin-bottom: 1rem;">

@@ -87,7 +87,7 @@ def quick_approve_or_reject_via_email(
                 </div>
                 <p>The doctor's account state has been updated live in the database.</p>
                 <div style="margin-top: 25px;">
-                    <a href="http://localhost:5173" style="background-color: #0f62fe; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 2px;">RETURN TO ORGANIZER DASHBOARD</a>
+                    <a href="http://localhost:5174" style="background-color: #0f62fe; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 2px;">RETURN TO ORGANIZER DASHBOARD</a>
                 </div>
             </div>
         </body>

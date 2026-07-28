@@ -84,7 +84,7 @@ class EmailService:
         return cls.send_email(email, subject, body)
 
     @classmethod
-    def send_verification_request_to_organizer(cls, user_id: int, name: str, email: str, spec: str, license_num: str, dept: str, phone: str, avatar_url: Optional[str] = None, base_url: str = "http://localhost:8000"):
+    def send_verification_request_to_organizer(cls, user_id: int, name: str, email: str, spec: str, license_num: str, dept: str, phone: str, avatar_url: Optional[str] = None, base_url: str = "http://localhost:8080"):
         token = cls.generate_quick_approval_token(user_id)
         approve_url = f"{base_url}/api/v1/users/quick-approve?user_id={user_id}&approve=true&token={token}"
         reject_url = f"{base_url}/api/v1/users/quick-approve?user_id={user_id}&approve=false&token={token}"
@@ -135,7 +135,7 @@ class EmailService:
             </div>
         </div>
         """
-        organizer_email = settings.SMTP_FROM_EMAIL if "example" not in settings.SMTP_FROM_EMAIL else "admin@qtransplant.org"
+        organizer_email = settings.ORGANIZER_EMAIL
         return cls.send_email(organizer_email, subject, body)
 
     @classmethod
