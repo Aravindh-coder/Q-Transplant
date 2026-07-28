@@ -69,7 +69,7 @@ def seed_initial_data():
     """Seeds initial administrative organizer and sample operational data if missing."""
     db = SessionLocal()
     try:
-        admin = db.query(User).filter((User.email == "admin@qtransplant.org") | (User.email == "aravindhjoshua10@gmail.com")).first()
+        admin = db.query(User).filter(User.email == "aravindhjoshua10@gmail.com").first()
         if not admin:
             logger.info("Seeding default Administrator (Organizer)...")
             admin = User(
