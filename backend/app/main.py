@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+from sqlalchemy import text
+
 from backend.app.core.config import settings
 from backend.app.core.database import engine, Base, SessionLocal
 from backend.app.core.security import get_password_hash
@@ -11,6 +13,19 @@ from backend.app.models.domain import User, UserRole, Hospital, Doctor, Donor, P
 from backend.app.routers import auth, users, organs, matches, telemetry, notifications, audit, hospitals, reports, ws
 
 Base.metadata.create_all(bind=engine)
+
+# Migration safety check for SQLite columns
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE doctors ADD COLUMN avatar_url VARCHAR(255);"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE doctors ADD COLUMN certificate_url VARCHAR(255);"))
+        conn.commit()
+    except Exception:
+        pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

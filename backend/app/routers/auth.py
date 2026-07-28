@@ -22,6 +22,9 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Access Control"])
 AVATARS_DIR = "backend/uploads/avatars"
 CERTIFICATES_DIR = "backend/uploads/certificates"
 
+os.makedirs(AVATARS_DIR, exist_ok=True)
+os.makedirs(CERTIFICATES_DIR, exist_ok=True)
+
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(payload: UserRegister, db: Session = Depends(get_db)):
@@ -36,7 +39,7 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
         )
 
     is_approved = True if payload.role.lower() == "organizer" else False
-    
+
     hashed_pwd = get_password_hash(payload.password)
     user = repo.create_user(
         email=payload.email,
@@ -47,6 +50,7 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
         is_approved=is_approved
     )
 
+    doc_profile = None
     if payload.role.lower() == "hospital":
         repo.create_hospital_profile(
             user_id=user.id,
@@ -58,7 +62,7 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
             contact_phone=payload.phone or "080-555-0199"
         )
     elif payload.role.lower() == "doctor":
-        repo.create_doctor_profile(
+        doc_profile = repo.create_doctor_profile(
             user_id=user.id,
             medical_license=payload.license_number or f"MED-{user.id:04d}",
             specialization=payload.specialization or "Transplant Surgery",
@@ -83,13 +87,27 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
         )
 
     audit.log_action(user_id=user.id, action="REGISTER", resource="User", details=f"Registered role {user.role}")
+
+    # Send Ack Email to registrant
     EmailService.send_registration_ack(user.email, user.full_name, user.role)
+
+    # If Doctor, send verification request with One-Click Approve / Reject links to Organizer
+    if payload.role.lower() == "doctor" and doc_profile:
+        EmailService.send_verification_request_to_organizer(
+            user_id=user.id,
+            name=user.full_name,
+            email=user.email,
+            spec=doc_profile.specialization,
+            license_num=doc_profile.medical_license,
+            dept=doc_profile.department,
+            phone=user.phone or doc_profile.phone,
+            avatar_url=getattr(doc_profile, 'avatar_url', None)
+        )
 
     return user
 
 
 @router.post("/register-doctor-camera", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-
 def register_doctor_camera(
     email: str = Form(...),
     password: str = Form(...),
@@ -116,8 +134,9 @@ def register_doctor_camera(
         image_bytes = base64.b64decode(encoded)
         with open(filepath, "wb") as f:
             f.write(image_bytes)
+        avatar_url = f"/uploads/avatars/{filename}"
     except Exception as e:
-        filepath = f"/uploads/avatars/default_doctor.jpg"
+        avatar_url = "/uploads/avatars/default_doctor.jpg"
 
     user = repo.create_user(
         email=email,
@@ -135,11 +154,26 @@ def register_doctor_camera(
         department=department,
         phone=phone
     )
-    doc.avatar_url = f"/uploads/avatars/{filename}"
+    doc.avatar_url = avatar_url
     db.commit()
 
     audit.log_action(user_id=user.id, action="REGISTER_CAMERA", resource="Doctor", details=f"Saved camera capture: {filename}")
+
+    # 1. Immediate ACK Email to Doctor
     EmailService.send_registration_ack(user.email, user.full_name, "doctor")
+
+    # 2. Immediate Verification Request Email to Organizer (Admin) with photo & One-Click Buttons
+    EmailService.send_verification_request_to_organizer(
+        user_id=user.id,
+        name=user.full_name,
+        email=user.email,
+        spec=doc.specialization,
+        license_num=doc.medical_license,
+        dept=doc.department,
+        phone=phone,
+        avatar_url=avatar_url
+    )
+
     return user
 
 
@@ -182,7 +216,6 @@ def request_password_reset(email: str = Form(...), db: Session = Depends(get_db)
     repo = UserRepository(db)
     user = repo.get_by_email(email)
     if not user:
-        # Prevent user enumeration
         return {"message": "If the account exists, a password reset link has been dispatched to your email."}
 
     reset_token = uuid.uuid4().hex
@@ -199,13 +232,23 @@ def request_password_reset(email: str = Form(...), db: Session = Depends(get_db)
 
     reset_link = f"http://localhost:5173/#reset-token={reset_token}"
     body = f"""
-    <p>Hello <strong>{user.full_name}</strong>,</p>
-    <p>A password reset request was issued for your Q-Transplant account.</p>
-    <p>Click the secure link below to set a new password (valid for 15 minutes):</p>
-    <p><a href="{reset_link}">{reset_link}</a></p>
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #f4f4f4; background-color: #161616;">
+        <div style="max-width: 550px; margin: 0 auto; background-color: #262626; border-top: 4px solid #0f62fe; padding: 30px;">
+            <h2 style="color: #0f62fe; margin-top: 0;">Password Reset Request</h2>
+            <p>Hello <strong>{user.full_name}</strong>,</p>
+            <p>A password reset request was issued for your Q-Transplant account.</p>
+            <p>Click the secure button below to choose a new password (token valid for 15 minutes):</p>
+            <div style="margin: 20px 0;">
+                <a href="{reset_link}" style="background-color: #0f62fe; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">RESET MY PASSWORD</a>
+            </div>
+            <p style="font-size: 12px; color: #8d8d8d;">Or copy link: {reset_link}</p>
+            <hr style="border: none; border-top: 1px solid #393939; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #8d8d8d;">Q-Transplant Security Center</p>
+        </div>
+    </div>
     """
     EmailService.send_email(user.email, "Q-Transplant Password Reset Link", body)
-    return {"message": "Password reset token generated and sent to registered email."}
+    return {"message": "Password reset token generated and sent to registered email.", "token": reset_token}
 
 
 @router.post("/reset-password")
@@ -214,16 +257,22 @@ def reset_password(token: str = Form(...), new_password: str = Form(...), db: Se
     if not reset_entry:
         raise HTTPException(status_code=400, detail="Invalid or already used password reset token.")
 
-    if datetime.now(timezone.utc) > reset_entry.expires_at.replace(tzinfo=timezone.utc):
+    expires = reset_entry.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires:
         raise HTTPException(status_code=400, detail="Password reset token has expired.")
 
-    user = db.query(UserRepository(db).get_by_id(reset_entry.user_id))
-    user = db.query(PasswordReset).filter(PasswordReset.id == reset_entry.id).first().user
+    repo = UserRepository(db)
+    user = repo.get_by_id(reset_entry.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
     user.password_hash = get_password_hash(new_password)
     reset_entry.used = True
     db.commit()
 
-    return {"message": "Password successfully updated. You may now log in."}
+    return {"message": "Password successfully updated. You may now log in with your new credentials."}
 
 
 @router.post("/refresh", response_model=Token)

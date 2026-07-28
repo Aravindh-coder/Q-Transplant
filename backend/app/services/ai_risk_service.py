@@ -44,18 +44,33 @@ class AIRiskService:
         """AI Assistant conversational response generator for transplant teams."""
         q_lower = query.lower()
 
+        if "eta" in q_lower or "transport" in q_lower or "arrival" in q_lower or "route" in q_lower or "time" in q_lower:
+            eta_data = cls.predict_transport_eta(18.5)
+            return (
+                f"AI Transport ETA Prediction: Distance is {eta_data['distance_km']} km via {eta_data['recommended_route']}. "
+                f"Base travel time: {eta_data['base_eta_minutes']} min | Urban traffic buffer: +{eta_data['traffic_delay_minutes']} min. "
+                f"Total Estimated Arrival Time: {eta_data['total_eta_minutes']} minutes."
+            )
+
+        if "risk" in q_lower or "predict" in q_lower or "ischemia" in q_lower or "decay" in q_lower:
+            return (
+                "AI Risk Analysis: Donor Heart (BOX-ESP32-001) ischemia degradation risk is LOW (14.2%). "
+                "Current preservation temperature 4.2°C is stable. Maximum cold ischemia tolerance: 4.0 hours. "
+                "Projected arrival margin: 2 hours 18 minutes ahead of critical ischemia cutoff."
+            )
+
+        if "alert" in q_lower or "recommend" in q_lower or "urgent" in q_lower or "priority" in q_lower:
+            return (
+                "AI Priority Recommendation: 1 Critical Heart Offer active for Patient Sarah Jenkins (Urgency 9/10). "
+                "Action Recommended: Pre-allocate Operation Theatre Suite 1 at Apollo Hospital immediately."
+            )
+
         if "match" in q_lower or "explain" in q_lower or "scoring" in q_lower:
             return (
                 "AI Analysis: Organ matches are ranked using multi-dimensional Quantum-Inspired optimization. "
                 "The engine evaluates ABO blood group compatibility as a mandatory gate, followed by HLA locus "
                 "cross-match ratio (35%), patient medical urgency index (25%), cold-box preservation time window "
                 "decay (15%), geographic transit distance (15%), and destination hospital ICU readiness (10%)."
-            )
-
-        if "urgent" in q_lower or "priority" in q_lower:
-            return (
-                "AI Alert: There is 1 High-Urgency Heart transplant request currently active. "
-                "Patient Sarah Jenkins (Urgency Score: 9/10, Blood O+) is at top position on the waiting list."
             )
 
         if "cold box" in q_lower or "temperature" in q_lower or "telemetry" in q_lower:
@@ -67,5 +82,5 @@ class AIRiskService:
 
         return (
             f"AI Assistant: Processed request for '{query}'. All platform subsystems are operating nominally. "
-            "You can use the sidebar shortcuts to navigate organ registries, hospital ICU readiness, or audit trails."
+            "You can use the quick buttons below or ask about organ matching algorithms, transport ETA predictions, or risk alerts."
         )

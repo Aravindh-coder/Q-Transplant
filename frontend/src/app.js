@@ -33,6 +33,19 @@ function initWebSocket() {
   }
 }
 
+function checkHashForResetToken() {
+  const hash = window.location.hash;
+  if (hash.includes('reset-token=')) {
+    const token = hash.split('reset-token=')[1].split('&')[0];
+    const resetModal = document.getElementById('reset-pwd-modal');
+    const tokenInput = document.getElementById('reset-token-input');
+    if (resetModal && tokenInput) {
+      tokenInput.value = token;
+      resetModal.style.display = 'flex';
+    }
+  }
+}
+
 function renderApp() {
   const root = document.getElementById('app');
   if (!root) return;
@@ -40,6 +53,7 @@ function renderApp() {
   if (!state.currentUser) {
     root.innerHTML = renderLoginView();
     attachAuthEvents();
+    checkHashForResetToken();
     return;
   }
 
@@ -90,6 +104,68 @@ function attachAuthEvents() {
   const roleSelect = document.getElementById('reg-role');
   const cameraSec = document.getElementById('doctor-camera-section');
 
+  const linkForgot = document.getElementById('link-forgot-pwd');
+  const forgotModal = document.getElementById('forgot-pwd-modal');
+  const closeForgotBtn = document.getElementById('btn-close-forgot-modal');
+  const formForgot = document.getElementById('form-forgot-password');
+
+  const resetModal = document.getElementById('reset-pwd-modal');
+  const closeResetBtn = document.getElementById('btn-close-reset-modal');
+  const formReset = document.getElementById('form-reset-password');
+
+  if (linkForgot && forgotModal) {
+    linkForgot.onclick = () => { forgotModal.style.display = 'flex'; };
+  }
+  if (closeForgotBtn && forgotModal) {
+    closeForgotBtn.onclick = () => { forgotModal.style.display = 'none'; };
+  }
+
+  if (formForgot) {
+    formForgot.onsubmit = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgot-email').value;
+      try {
+        const formData = new FormData();
+        formData.append('email', email);
+        const res = await fetch('/api/v1/auth/forgot-password', { method: 'POST', body: formData });
+        const data = await res.json();
+        ToastManager.show(data.message || 'Reset token link dispatched to email.', 'info');
+        forgotModal.style.display = 'none';
+        if (data.token) {
+          window.location.hash = `#reset-token=${data.token}`;
+          checkHashForResetToken();
+        }
+      } catch (err) {
+        ToastManager.show('Error requesting reset: ' + err.message, 'error');
+      }
+    };
+  }
+
+  if (closeResetBtn && resetModal) {
+    closeResetBtn.onclick = () => { resetModal.style.display = 'none'; };
+  }
+
+  if (formReset) {
+    formReset.onsubmit = async (e) => {
+      e.preventDefault();
+      const token = document.getElementById('reset-token-input').value;
+      const newPassword = document.getElementById('reset-new-password').value;
+      try {
+        const formData = new FormData();
+        formData.append('token', token);
+        formData.append('new_password', newPassword);
+        const res = await fetch('/api/v1/auth/reset-password', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Reset failed');
+        ToastManager.show(data.message || 'Password successfully updated!', 'success');
+        resetModal.style.display = 'none';
+        window.location.hash = '';
+      } catch (err) {
+        ToastManager.show('Password reset error: ' + err.message, 'error');
+      }
+    };
+  }
+
   if (roleSelect && cameraSec) {
     roleSelect.onchange = () => {
       cameraSec.style.display = roleSelect.value === 'doctor' ? 'block' : 'none';
@@ -101,7 +177,7 @@ function attachAuthEvents() {
       CameraModal.startCamera((base64) => {
         cameraInput.value = base64;
         avatarThumb.src = base64;
-        ToastManager.show('Live camera snapshot captured!', 'success');
+        ToastManager.show('Live camera photo captured successfully!', 'success');
       });
     };
   }
@@ -124,7 +200,7 @@ function attachAuthEvents() {
   if (formLogin) {
     formLogin.onsubmit = async (e) => {
       e.preventDefault();
-      errBox.style.display = 'none';
+      if (errBox) errBox.style.display = 'none';
       const email = document.getElementById('login-email').value;
       const pwd = document.getElementById('login-password').value;
 
@@ -139,10 +215,13 @@ function attachAuthEvents() {
           is_approved: tokenData.is_approved
         });
         ToastManager.show(`Welcome back, ${tokenData.full_name}!`, 'success');
-        loadSystemData();
+        await loadSystemData();
       } catch (err) {
-        errBox.textContent = err.message || 'Authentication failed.';
-        errBox.style.display = 'block';
+        if (errBox) {
+          errBox.textContent = err.message || 'Authentication credentials invalid.';
+          errBox.style.display = 'block';
+        }
+        ToastManager.show('Login failed: ' + (err.message || 'Invalid credentials'), 'error');
       }
     };
   }
@@ -150,7 +229,7 @@ function attachAuthEvents() {
   if (formReg) {
     formReg.onsubmit = async (e) => {
       e.preventDefault();
-      errBox.style.display = 'none';
+      if (errBox) errBox.style.display = 'none';
       const role = document.getElementById('reg-role').value;
       const email = document.getElementById('reg-email').value;
       const pwd = document.getElementById('reg-password').value;
@@ -165,19 +244,26 @@ function attachAuthEvents() {
           formData.append('phone', '080-555-0100');
           formData.append('license_number', `MED-${Date.now().toString().slice(-4)}`);
           formData.append('specialization', 'Transplant Surgery');
-          formData.append('department', 'Surgery');
+          formData.append('department', 'Cardiothoracic');
           formData.append('camera_image_base64', cameraInput.value);
 
-          await fetch('/api/v1/auth/register-doctor-camera', { method: 'POST', body: formData });
+          const res = await fetch('/api/v1/auth/register-doctor-camera', { method: 'POST', body: formData });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.detail || 'Doctor camera registration failed');
+          }
         } else {
           await ApiService.register({ email, password: pwd, full_name: name, role });
         }
 
-        ToastManager.show('Registration successful! Submitted for admin approval.', 'success');
-        tabLogin.click();
+        ToastManager.show('Registration successful! Verification email sent to Admin and registrant.', 'success');
+        if (tabLogin) tabLogin.click();
       } catch (err) {
-        errBox.textContent = err.message || 'Registration failed.';
-        errBox.style.display = 'block';
+        if (errBox) {
+          errBox.textContent = err.message || 'Registration failed.';
+          errBox.style.display = 'block';
+        }
+        ToastManager.show('Registration error: ' + err.message, 'error');
       }
     };
   }
@@ -211,12 +297,31 @@ function attachGlobalEvents() {
     };
   });
 
+  // Admin User Approvals (Approve Button)
   document.querySelectorAll('.btn-approve-user').forEach(btn => {
     btn.onclick = async () => {
       const id = parseInt(btn.getAttribute('data-id'));
-      await ApiService.approveUser(id, true);
-      ToastManager.show('User approved successfully.', 'success');
-      loadSystemData();
+      try {
+        await ApiService.approveUser(id, true, 'Approved by Organizer from Dashboard');
+        ToastManager.show('User approved successfully! Approval email dispatched.', 'success');
+        await loadSystemData();
+      } catch (err) {
+        ToastManager.show('Approval error: ' + err.message, 'error');
+      }
+    };
+  });
+
+  // Admin User Approvals (Reject Button)
+  document.querySelectorAll('.btn-reject-user').forEach(btn => {
+    btn.onclick = async () => {
+      const id = parseInt(btn.getAttribute('data-id'));
+      try {
+        await ApiService.approveUser(id, false, 'Rejected by Organizer from Dashboard');
+        ToastManager.show('User registration rejected. Notification email sent.', 'info');
+        await loadSystemData();
+      } catch (err) {
+        ToastManager.show('Rejection error: ' + err.message, 'error');
+      }
     };
   });
 
@@ -227,7 +332,7 @@ function attachGlobalEvents() {
       try {
         const matches = await ApiService.computeMatches(organId);
         ToastManager.show(`Computed ${matches.length} Quantum Matches!`, 'success');
-        loadSystemData();
+        await loadSystemData();
       } catch (err) {
         ToastManager.show('Error computing matches: ' + err.message, 'error');
       }
@@ -260,6 +365,8 @@ async function loadSystemData() {
 }
 
 subscribe(renderApp);
+
+window.addEventListener('hashchange', checkHashForResetToken);
 
 document.addEventListener('DOMContentLoaded', async () => {
   initWebSocket();
