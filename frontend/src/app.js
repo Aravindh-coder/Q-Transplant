@@ -14,6 +14,7 @@ import { renderDashboardHospital } from './pages/DashboardHospital.js';
 import { renderDashboardDonor } from './pages/DashboardDonor.js';
 import { renderDashboardPatient } from './pages/DashboardPatient.js';
 
+import { renderQuantumMatchView, attachQuantumMatchEvents } from './pages/QuantumMatchView.js';
 import { renderTelemetryGauge } from './components/TelemetryGauge.js';
 
 let wsConnection = null;
@@ -208,33 +209,7 @@ function renderActiveTab() {
   }
 
   if (tab === 'matching') {
-    const matches = state.matches || [];
-    return `
-      <div>
-        <h1 class="dash-title" style="margin-bottom:1rem;"><i class="fa-solid fa-dna" style="color:#8a3ffc;margin-right:8px;"></i>Grover's Quantum Match Engine</h1>
-        <div class="ultra-table-wrap">
-          <div class="ultra-table-header">
-            <div class="ultra-table-title">Computed Compatibility Matches (${matches.length})</div>
-          </div>
-          <table class="utbl">
-            <thead>
-              <tr><th>Match ID</th><th>Organ ID</th><th>Patient ID</th><th>Score</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              ${matches.map(m => `
-                <tr>
-                  <td>#MATCH-${m.id}</td>
-                  <td>#ORGAN-${m.organ_id}</td>
-                  <td>#PATIENT-${m.patient_id}</td>
-                  <td><strong style="color:#42be65;">${m.compatibility_score.toFixed(1)}%</strong></td>
-                  <td><span class="bx--tag bx--tag--green">${m.status ? m.status.toUpperCase() : 'COMPUTED'}</span></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
+    return renderQuantumMatchView();
   }
 
   if (tab === 'telemetry') {
@@ -462,6 +437,8 @@ function attachGlobalEvents() {
       if (targetEl) targetEl.style.display = 'block';
     };
   });
+
+  attachQuantumMatchEvents();
 
   document.querySelectorAll('.bx--side-nav__link').forEach(link => {
     link.onclick = (e) => {
