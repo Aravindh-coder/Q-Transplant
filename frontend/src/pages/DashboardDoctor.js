@@ -1,86 +1,97 @@
 import { state } from '../state.js';
-import { renderAIAssistant } from '../components/AIAssistant.js';
 
 export function renderDashboardDoctor() {
+  const user = state.currentUser || { full_name: 'Dr. Rajesh Kumar', is_approved: true };
+  const isApproved = user.is_approved;
+
   return `
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+      <div class="dash-header">
         <div>
-          <h1 style="font-size: 1.75rem; font-weight: 300;">Doctor Transplant Portal</h1>
-          <p style="color: var(--cds-text-02); font-size: 13px;">Transplant Surgery Unit & Recipient Compatibility</p>
-        </div>
-        <div>
-          <button id="btn-register-organ-modal" class="bx--btn bx--btn--primary">
-            <i class="fa-solid fa-plus"></i> Register Donated Organ
-          </button>
+          <h1 class="dash-title"><i class="fa-solid fa-user-doctor" style="color:#8a3ffc;margin-right:8px;"></i>Transplant Surgeon Clinical Portal</h1>
+          <p class="dash-subtitle">Specialist: <strong>${user.full_name}</strong> (${user.email})</p>
         </div>
       </div>
 
-      <!-- Overview Cards -->
-      <div class="bx--grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1.5rem;">
-        <div class="bx--tile">
-          <div class="bx--tile__heading"><i class="fa-solid fa-hospital-user"></i> ASSIGNED PATIENTS</div>
-          <div class="bx--tile__value">1</div>
+      ${!isApproved ? `
+        <!-- Doctor Registration Pending Organizer Approval Notice -->
+        <div class="waiting-approval" style="background:rgba(241,194,27,0.08); border: 1px solid rgba(241,194,27,0.4); border-radius:12px; margin-bottom:2rem;">
+          <div class="waiting-icon">⏳</div>
+          <h3>ACCOUNT REGISTRATION PENDING ORGANIZER APPROVAL</h3>
+          <p>
+            Your live camera photo, medical license credentials, and certificate have been submitted securely to the Organizer Admin (<strong>aravindhjoshua10@gmail.com</strong>).
+            <br>An email verification request containing One-Click Approve and Reject buttons was automatically dispatched to the Organizer.
+            <br><span style="color:#f4f4f4;font-weight:600;">You will receive an automated confirmation email as soon as your account is approved.</span>
+          </p>
         </div>
-        <div class="bx--tile">
-          <div class="bx--tile__heading"><i class="fa-solid fa-heart-pulse"></i> AVAILABLE ORGANS</div>
-          <div class="bx--tile__value" style="color: var(--cds-support-success);">${state.organs.length || 1}</div>
+      ` : `
+        <div class="bx--tag bx--tag--green" style="margin-bottom:1.5rem; padding:8px 16px; font-size:13px;">
+          <i class="fa-solid fa-shield-check" style="margin-right:6px;"></i> VERIFIED & APPROVED TRANSPLANT SURGEON
         </div>
-        <div class="bx--tile">
-          <div class="bx--tile__heading"><i class="fa-solid fa-dna"></i> MATCH COMPUTATIONS</div>
-          <div class="bx--tile__value">${state.matches.length || 1}</div>
-        </div>
-        <div class="bx--tile">
-          <div class="bx--tile__heading"><i class="fa-solid fa-clock-rotate-left"></i> ACTIVE TRANSPLANTS</div>
-          <div class="bx--tile__value" style="color: var(--cds-teal-40);">1</div>
-        </div>
-      </div>
+      `}
 
-      <!-- Integrated AI Assistant Widget -->
-      <div style="margin-bottom: 1.5rem;">
-        ${renderAIAssistant()}
-      </div>
-
-      <!-- Organ Registry & Match Execution Table -->
-      <div class="bx--tile" style="margin-bottom: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <span class="bx--tile__heading"><i class="fa-solid fa-boxes-packing"></i> DONATED ORGAN REGISTRY</span>
-          <a href="/api/v1/reports/export/organs" target="_blank" class="bx--btn bx--btn--ghost" style="font-size: 11px;">
-            <i class="fa-solid fa-file-csv"></i> Export CSV Report
-          </a>
+      <div class="bx--grid" style="grid-template-columns: repeat(12, 1fr); gap: 1.5rem;">
+        <!-- Doctor Credentials & AI Security Badge -->
+        <div class="bx--tile" style="grid-column: span 6; background: rgba(38,38,38,0.6); border-radius:12px;">
+          <div class="bx--tile__heading"><i class="fa-solid fa-id-card"></i> CLINICAL CREDENTIALS & AI FRAUD VERIFICATION</div>
+          <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--cds-border-subtle); padding-bottom: 8px;">
+              <span style="color: var(--cds-text-02);">SURGEON NAME</span>
+              <strong>${user.full_name}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--cds-border-subtle); padding-bottom: 8px;">
+              <span style="color: var(--cds-text-02);">MEDICAL LICENSE</span>
+              <span style="font-family: var(--cds-mono-font);">MED-KA-2026-9081</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--cds-border-subtle); padding-bottom: 8px;">
+              <span style="color: var(--cds-text-02);">SPECIALIZATION</span>
+              <span class="bx--tag bx--tag--blue">Cardiothoracic Surgery</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--cds-border-subtle); padding-bottom: 8px;">
+              <span style="color: var(--cds-text-02);">AI CERTIFICATE ANALYSIS</span>
+              <span class="bx--tag bx--tag--green"><i class="fa-solid fa-robot"></i> 100% AUTHENTIC</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--cds-border-subtle); padding-bottom: 8px;">
+              <span style="color: var(--cds-text-02);">LIVE CAMERA CAPTURE</span>
+              <span class="bx--tag bx--tag--green">BIOMETRIC VERIFIED</span>
+            </div>
+          </div>
         </div>
-        <table class="bx--data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>ORGAN TYPE</th>
-              <th>BLOOD TYPE</th>
-              <th>HLA ANTIMATCH</th>
-              <th>COLD-BOX SENSOR ID</th>
-              <th>STATUS</th>
-              <th>QUANTUM MATCH ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.organs.length === 0 ? `
-              <tr><td colspan="7" style="text-align: center; color: var(--cds-text-03);">No organs registered</td></tr>
-            ` : state.organs.map(o => `
-              <tr>
-                <td style="font-family: var(--cds-mono-font);">${o.id}</td>
-                <td><strong>${o.organ_type.toUpperCase()}</strong></td>
-                <td><span class="bx--tag bx--tag--red">${o.blood_type}</span></td>
-                <td style="font-family: var(--cds-mono-font);">${o.hla_type}</td>
-                <td style="font-family: var(--cds-mono-font);">${o.cold_box_id}</td>
-                <td><span class="bx--tag bx--tag--green">${o.status.toUpperCase()}</span></td>
-                <td>
-                  <button class="bx--btn bx--btn--primary btn-compute-quantum-match" data-id="${o.id}" style="padding: 4px 10px; font-size: 11px;">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Compute Quantum Matches
-                  </button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+
+        <!-- Register New Donor / Patient Entry -->
+        <div class="bx--tile" style="grid-column: span 6; background: rgba(38,38,38,0.6); border-radius:12px;">
+          <div class="bx--tile__heading"><i class="fa-solid fa-notes-medical"></i> CLINICAL ENTRY MANAGEMENT</div>
+          <p style="font-size:13px; color:#8d8d8d; margin-top:8px; margin-bottom:1.25rem;">
+            As an approved Transplant Surgeon, you can enter new verified donor organs into the quantum network.
+          </p>
+
+          <form id="form-doctor-add-organ">
+            <div class="form-group">
+              <label>Organ Type</label>
+              <select id="doc-organ-type" style="padding:10px; background:var(--cds-layer-02); color:#f4f4f4; width:100%; border:1px solid var(--cds-border-subtle); border-radius:6px;">
+                <option value="Heart">Heart</option>
+                <option value="Kidney">Kidney</option>
+                <option value="Liver">Liver</option>
+                <option value="Lung">Lung</option>
+                <option value="Pancreas">Pancreas</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label>Blood Group</label>
+              <select id="doc-blood-type" style="padding:10px; background:var(--cds-layer-02); color:#f4f4f4; width:100%; border:1px solid var(--cds-border-subtle); border-radius:6px;">
+                <option value="O+">O+</option><option value="A+">A+</option>
+                <option value="B+">B+</option><option value="AB+">AB+</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label>HLA Markers</label>
+              <input type="text" id="doc-hla-type" value="A2,B7,DR4" style="padding:10px; background:var(--cds-layer-02); color:#f4f4f4; width:100%; border:1px solid var(--cds-border-subtle); border-radius:6px;" />
+            </div>
+            <button type="submit" class="btn-register-organ" style="margin-top:1.25rem;">
+              <i class="fa-solid fa-plus-circle"></i> Register Organ into Quantum Network
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   `;

@@ -24,6 +24,41 @@ def list_all_users(
     return repo.list_users(role=role, approved_only=approved_only)
 
 
+@router.get("/all-detailed")
+def get_all_users_detailed(
+    db: Session = Depends(get_db),
+    current_token: dict = Depends(RoleChecker(["organizer"]))
+):
+    """Returns all users grouped by role — for Organizer master dashboard."""
+    from backend.app.models.domain import User, Doctor, Hospital, Donor, Patient
+    users = db.query(User).all()
+    result = {
+        "doctors": [],
+        "hospitals": [],
+        "donors": [],
+        "patients": [],
+        "organizers": [],
+        "pending": []
+    }
+    for u in users:
+        entry = {
+            "id": u.id,
+            "full_name": u.full_name,
+            "email": u.email,
+            "role": u.role,
+            "phone": u.phone,
+            "is_approved": u.is_approved,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat() if u.created_at else None
+        }
+        role_key = u.role.lower() + "s" if u.role.lower() not in ("organizer",) else "organizers"
+        if role_key in result:
+            result[role_key].append(entry)
+        if not u.is_approved and u.role.lower() != "organizer":
+            result["pending"].append(entry)
+    return result
+
+
 @router.get("/pending-approvals", response_model=List[UserOut])
 def list_pending_approvals(
     db: Session = Depends(get_db),

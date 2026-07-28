@@ -14,7 +14,7 @@ router = APIRouter(prefix="/organs", tags=["Organ Donation Registry"])
 def register_donated_organ(
     payload: OrganCreate,
     db: Session = Depends(get_db),
-    current_token: dict = Depends(RoleChecker(["organizer", "doctor", "hospital"]))
+    current_token: dict = Depends(RoleChecker(["organizer", "doctor", "hospital", "donor"]))
 ):
     repo = OrganRepository(db)
     audit = AuditRepository(db)

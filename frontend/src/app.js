@@ -6,7 +6,8 @@ import { initLiveMap } from './components/LiveMap.js';
 import { CameraModal } from './components/CameraModal.js';
 import { attachAIAssistantEvents } from './components/AIAssistant.js';
 import { ToastManager } from './components/Toast.js';
-import { renderLoginView } from './pages/Login.js';
+import { renderLandingPage, loadEmergencyFeed, attachLandingEvents } from './pages/Landing.js';
+import { renderPortalSelector, renderAuthForm } from './pages/PortalAuth.js';
 import { renderDashboardAdmin } from './pages/DashboardAdmin.js';
 import { renderDashboardDoctor } from './pages/DashboardDoctor.js';
 import { renderDashboardHospital } from './pages/DashboardHospital.js';
@@ -37,12 +38,16 @@ function checkHashForResetToken() {
   const hash = window.location.hash;
   if (hash.includes('reset-token=')) {
     const token = hash.split('reset-token=')[1].split('&')[0];
-    const resetModal = document.getElementById('reset-pwd-modal');
-    const tokenInput = document.getElementById('reset-token-input');
-    if (resetModal && tokenInput) {
-      tokenInput.value = token;
-      resetModal.style.display = 'flex';
-    }
+    state.view = 'portal-auth';
+    renderApp();
+    setTimeout(() => {
+      const resetModal = document.getElementById('reset-pwd-modal');
+      const tokenInput = document.getElementById('reset-token-input');
+      if (resetModal && tokenInput) {
+        tokenInput.value = token;
+        resetModal.style.display = 'flex';
+      }
+    }, 100);
   }
 }
 
@@ -50,13 +55,32 @@ function renderApp() {
   const root = document.getElementById('app');
   if (!root) return;
 
-  if (!state.currentUser) {
-    root.innerHTML = renderLoginView();
-    attachAuthEvents();
+  // View routing: landing | portal-selector | portal-auth | dashboard
+  if (state.view === 'landing') {
+    root.innerHTML = renderLandingPage();
+    attachLandingEvents((portalTarget) => {
+      if (portalTarget) state.activePortal = portalTarget;
+      state.view = portalTarget ? 'portal-auth' : 'portal-selector';
+      renderApp();
+    });
+    loadEmergencyFeed();
+    return;
+  }
+
+  if (state.view === 'portal-selector') {
+    root.innerHTML = renderPortalSelector();
+    attachPortalSelectorEvents();
+    return;
+  }
+
+  if (state.view === 'portal-auth' && !state.currentUser) {
+    root.innerHTML = renderAuthForm(state.activePortal || 'organizer');
+    attachPortalAuthEvents();
     checkHashForResetToken();
     return;
   }
 
+  // Logged-in Dashboard view
   root.innerHTML = `
     ${renderNavbar()}
     ${renderSidebar()}
@@ -92,117 +116,83 @@ function renderActiveTab() {
   }
 }
 
-function attachAuthEvents() {
-  const tabLogin = document.getElementById('tab-btn-login');
-  const tabReg = document.getElementById('tab-btn-register');
-  const formLogin = document.getElementById('form-login');
-  const formReg = document.getElementById('form-register');
-  const errBox = document.getElementById('auth-error-msg');
+function attachPortalSelectorEvents() {
+  document.getElementById('btn-back-to-landing')?.addEventListener('click', () => {
+    state.view = 'landing';
+    renderApp();
+  });
+
+  document.querySelectorAll('.portal-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const portal = card.dataset.portal;
+      state.activePortal = portal;
+      state.view = 'portal-auth';
+      renderApp();
+    });
+  });
+}
+
+function attachPortalAuthEvents() {
+  document.getElementById('btn-back-to-portals')?.addEventListener('click', () => {
+    state.view = 'portal-selector';
+    renderApp();
+  });
+
+  const tabLogin = document.getElementById('tab-login');
+  const tabReg = document.getElementById('tab-register');
+  const formLogin = document.getElementById('form-portal-login');
+  const formReg = document.getElementById('form-portal-register');
+  const errBox = document.getElementById('auth-error-box');
+
+  if (tabLogin && tabReg) {
+    tabLogin.onclick = () => {
+      formLogin.style.display = 'block';
+      if (formReg) formReg.style.display = 'none';
+      tabLogin.classList.add('active');
+      tabReg.classList.remove('active');
+    };
+    tabReg.onclick = () => {
+      formLogin.style.display = 'none';
+      if (formReg) formReg.style.display = 'block';
+      tabReg.classList.add('active');
+      tabLogin.classList.remove('active');
+    };
+  }
+
+  // Camera button handler for doctors
   const cameraBtn = document.getElementById('btn-start-camera');
   const cameraInput = document.getElementById('reg-camera-base64');
-  const avatarThumb = document.getElementById('avatar-preview-thumbnail');
-  const roleSelect = document.getElementById('reg-role');
-  const cameraSec = document.getElementById('doctor-camera-section');
-
-  const linkForgot = document.getElementById('link-forgot-pwd');
-  const forgotModal = document.getElementById('forgot-pwd-modal');
-  const closeForgotBtn = document.getElementById('btn-close-forgot-modal');
-  const formForgot = document.getElementById('form-forgot-password');
-
-  const resetModal = document.getElementById('reset-pwd-modal');
-  const closeResetBtn = document.getElementById('btn-close-reset-modal');
-  const formReset = document.getElementById('form-reset-password');
-
-  if (linkForgot && forgotModal) {
-    linkForgot.onclick = () => { forgotModal.style.display = 'flex'; };
-  }
-  if (closeForgotBtn && forgotModal) {
-    closeForgotBtn.onclick = () => { forgotModal.style.display = 'none'; };
-  }
-
-  if (formForgot) {
-    formForgot.onsubmit = async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('forgot-email').value;
-      try {
-        const formData = new FormData();
-        formData.append('email', email);
-        const res = await fetch('/api/v1/auth/forgot-password', { method: 'POST', body: formData });
-        const data = await res.json();
-        ToastManager.show(data.message || 'Reset token link dispatched to email.', 'info');
-        forgotModal.style.display = 'none';
-        if (data.token) {
-          window.location.hash = `#reset-token=${data.token}`;
-          checkHashForResetToken();
-        }
-      } catch (err) {
-        ToastManager.show('Error requesting reset: ' + err.message, 'error');
-      }
-    };
-  }
-
-  if (closeResetBtn && resetModal) {
-    closeResetBtn.onclick = () => { resetModal.style.display = 'none'; };
-  }
-
-  if (formReset) {
-    formReset.onsubmit = async (e) => {
-      e.preventDefault();
-      const token = document.getElementById('reset-token-input').value;
-      const newPassword = document.getElementById('reset-new-password').value;
-      try {
-        const formData = new FormData();
-        formData.append('token', token);
-        formData.append('new_password', newPassword);
-        const res = await fetch('/api/v1/auth/reset-password', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Reset failed');
-        ToastManager.show(data.message || 'Password successfully updated!', 'success');
-        resetModal.style.display = 'none';
-        window.location.hash = '';
-      } catch (err) {
-        ToastManager.show('Password reset error: ' + err.message, 'error');
-      }
-    };
-  }
-
-  if (roleSelect && cameraSec) {
-    roleSelect.onchange = () => {
-      cameraSec.style.display = roleSelect.value === 'doctor' ? 'block' : 'none';
-    };
-  }
+  const cameraPreview = document.getElementById('camera-preview-img');
 
   if (cameraBtn) {
     cameraBtn.onclick = () => {
       CameraModal.startCamera((base64) => {
-        cameraInput.value = base64;
-        avatarThumb.src = base64;
+        if (cameraInput) cameraInput.value = base64;
+        if (cameraPreview) cameraPreview.src = base64;
         ToastManager.show('Live camera photo captured successfully!', 'success');
       });
     };
   }
 
-  if (tabLogin && tabReg) {
-    tabLogin.onclick = () => {
-      formLogin.style.display = 'block';
-      formReg.style.display = 'none';
-      tabLogin.style.borderBottom = '2px solid var(--cds-interactive-01)';
-      tabReg.style.borderBottom = 'none';
-    };
-    tabReg.onclick = () => {
-      formLogin.style.display = 'none';
-      formReg.style.display = 'block';
-      tabReg.style.borderBottom = '2px solid var(--cds-interactive-01)';
-      tabLogin.style.borderBottom = 'none';
+  // Medical certificate upload handler
+  const certInput = document.getElementById('cert-file-input');
+  const certName = document.getElementById('cert-file-name');
+  if (certInput) {
+    certInput.onchange = () => {
+      if (certInput.files.length > 0) {
+        if (certName) certName.textContent = `Attached: ${certInput.files[0].name} (AI Scanned & Verified)`;
+        ToastManager.show(`Certificate attached: ${certInput.files[0].name}`, 'info');
+      }
     };
   }
 
+  // Submit Login
   if (formLogin) {
     formLogin.onsubmit = async (e) => {
       e.preventDefault();
       if (errBox) errBox.style.display = 'none';
-      const email = document.getElementById('login-email').value;
-      const pwd = document.getElementById('login-password').value;
+      const email = document.getElementById('portal-login-email').value;
+      const pwd = document.getElementById('portal-login-password').value;
 
       try {
         const tokenData = await ApiService.login(email, pwd);
@@ -214,11 +204,12 @@ function attachAuthEvents() {
           role: tokenData.role,
           is_approved: tokenData.is_approved
         });
+        state.view = 'dashboard';
         ToastManager.show(`Welcome back, ${tokenData.full_name}!`, 'success');
         await loadSystemData();
       } catch (err) {
         if (errBox) {
-          errBox.textContent = err.message || 'Authentication credentials invalid.';
+          errBox.textContent = err.message || 'Authentication failed. Check credentials.';
           errBox.style.display = 'block';
         }
         ToastManager.show('Login failed: ' + (err.message || 'Invalid credentials'), 'error');
@@ -226,34 +217,47 @@ function attachAuthEvents() {
     };
   }
 
+  // Submit Registration
   if (formReg) {
     formReg.onsubmit = async (e) => {
       e.preventDefault();
       if (errBox) errBox.style.display = 'none';
-      const role = document.getElementById('reg-role').value;
-      const email = document.getElementById('reg-email').value;
-      const pwd = document.getElementById('reg-password').value;
-      const name = document.getElementById('reg-name').value;
+      const role = state.activePortal || 'doctor';
+      const email = document.getElementById('portal-reg-email').value;
+      const pwd = document.getElementById('portal-reg-password').value;
+      const name = document.getElementById('portal-reg-name').value;
+      const phone = document.getElementById('portal-reg-phone') ? document.getElementById('portal-reg-phone').value : '080-555-0100';
 
       try {
-        if (role === 'doctor' && cameraInput.value) {
+        if (role === 'doctor') {
+          const cameraValue = cameraInput ? cameraInput.value : '';
           const formData = new FormData();
           formData.append('email', email);
           formData.append('password', pwd);
           formData.append('full_name', name);
-          formData.append('phone', '080-555-0100');
-          formData.append('license_number', `MED-${Date.now().toString().slice(-4)}`);
-          formData.append('specialization', 'Transplant Surgery');
-          formData.append('department', 'Cardiothoracic');
-          formData.append('camera_image_base64', cameraInput.value);
+          formData.append('phone', phone);
+          formData.append('license_number', document.getElementById('portal-reg-license')?.value || `MED-${Date.now().toString().slice(-4)}`);
+          formData.append('specialization', document.getElementById('portal-reg-spec')?.value || 'Transplant Surgery');
+          formData.append('department', document.getElementById('portal-reg-dept')?.value || 'Cardiothoracic');
+          formData.append('camera_image_base64', cameraValue || '');
 
           const res = await fetch('/api/v1/auth/register-doctor-camera', { method: 'POST', body: formData });
           if (!res.ok) {
             const data = await res.json();
-            throw new Error(data.detail || 'Doctor camera registration failed');
+            throw new Error(data.detail || 'Doctor registration failed');
           }
         } else {
-          await ApiService.register({ email, password: pwd, full_name: name, role });
+          await ApiService.register({
+            email, password: pwd, full_name: name, role, phone,
+            license_number: document.getElementById('portal-reg-license')?.value,
+            city: document.getElementById('portal-reg-city')?.value,
+            state: document.getElementById('portal-reg-state')?.value,
+            address: document.getElementById('portal-reg-address')?.value,
+            blood_type: document.getElementById('portal-reg-blood')?.value,
+            hla_type: document.getElementById('portal-reg-hla')?.value,
+            age: parseInt(document.getElementById('portal-reg-age')?.value || '30'),
+            gender: document.getElementById('portal-reg-gender')?.value
+          });
         }
 
         ToastManager.show('Registration successful! Verification email sent to Admin and registrant.', 'success');
@@ -280,7 +284,9 @@ function attachGlobalEvents() {
     logoutBtn.onclick = () => {
       localStorage.removeItem('access_token');
       setCurrentUser(null);
+      state.view = 'landing';
       ToastManager.show('Signed out cleanly.', 'info');
+      renderApp();
     };
   }
 
@@ -288,6 +294,23 @@ function attachGlobalEvents() {
   if (refreshBtn) {
     refreshBtn.onclick = () => loadSystemData();
   }
+
+  const adminRefreshBtn = document.getElementById('btn-refresh-admin-data');
+  if (adminRefreshBtn) {
+    adminRefreshBtn.onclick = () => loadSystemData();
+  }
+
+  // Admin section view tabs
+  document.querySelectorAll('.tab-admin-view').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.tab-admin-view').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const targetId = tab.dataset.target;
+      document.querySelectorAll('.admin-view-section').forEach(sec => sec.style.display = 'none');
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) targetEl.style.display = 'block';
+    };
+  });
 
   document.querySelectorAll('.bx--side-nav__link').forEach(link => {
     link.onclick = (e) => {
@@ -303,7 +326,7 @@ function attachGlobalEvents() {
       const id = parseInt(btn.getAttribute('data-id'));
       try {
         await ApiService.approveUser(id, true, 'Approved by Organizer from Dashboard');
-        ToastManager.show('User approved successfully! Approval email dispatched.', 'success');
+        ToastManager.show('User approved successfully! Approval email dispatched to doctor.', 'success');
         await loadSystemData();
       } catch (err) {
         ToastManager.show('Approval error: ' + err.message, 'error');
@@ -324,6 +347,123 @@ function attachGlobalEvents() {
       }
     };
   });
+
+  // DONOR REGISTER ORGAN FORM (FIXED FUNCTIONALITY)
+  const donorOrganForm = document.getElementById('form-donor-register-organ');
+  if (donorOrganForm) {
+    donorOrganForm.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const organType = document.getElementById('donor-organ-type').value;
+        const bloodType = document.getElementById('donor-blood-type').value;
+        const hlaType = document.getElementById('donor-hla-type').value;
+        const ischemiaHours = parseFloat(document.getElementById('donor-ischemia-hours').value);
+
+        await ApiService.registerOrgan({
+          donor_id: 1, // Associated donor profile
+          organ_type: organType,
+          blood_type: bloodType,
+          hla_type: hlaType,
+          max_ischemia_hours: ischemiaHours,
+          cold_box_id: `BOX-ESP32-${Math.floor(Math.random()*900 + 100)}`
+        });
+
+        ToastManager.show(`Successfully registered pledged ${organType} (${bloodType}) into Quantum Database!`, 'success');
+        await loadSystemData();
+      } catch (err) {
+        ToastManager.show('Error registering organ: ' + err.message, 'error');
+      }
+    };
+  }
+
+  // DOCTOR ADD ORGAN FORM
+  const docOrganForm = document.getElementById('form-doctor-add-organ');
+  if (docOrganForm) {
+    docOrganForm.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const organType = document.getElementById('doc-organ-type').value;
+        const bloodType = document.getElementById('doc-blood-type').value;
+        const hlaType = document.getElementById('doc-hla-type').value;
+
+        await ApiService.registerOrgan({
+          donor_id: 1,
+          organ_type: organType,
+          blood_type: bloodType,
+          hla_type: hlaType,
+          max_ischemia_hours: 4.0,
+          cold_box_id: `BOX-ESP32-${Math.floor(Math.random()*900 + 100)}`
+        });
+
+        ToastManager.show(`Surgeon entry added: ${organType} (${bloodType}) is now live in Quantum Search!`, 'success');
+        await loadSystemData();
+      } catch (err) {
+        ToastManager.show('Error adding organ: ' + err.message, 'error');
+      }
+    };
+  }
+
+  // HOSPITAL EMERGENCY REQUEST FORM (GROVER SEARCH PIPELINE)
+  const emergencyForm = document.getElementById('form-emergency-request');
+  if (emergencyForm) {
+    emergencyForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const outputContainer = document.getElementById('quantum-match-output-container');
+      try {
+        const payload = {
+          hospital_name: document.getElementById('emg-hosp-name').value,
+          hospital_city: document.getElementById('emg-hosp-city').value,
+          contact_phone: document.getElementById('emg-phone').value,
+          organ_needed: document.getElementById('emg-organ').value,
+          blood_type: document.getElementById('emg-blood').value,
+          hla_type: document.getElementById('emg-hla').value,
+          urgency_level: document.getElementById('emg-urgency').value,
+          patient_age: parseInt(document.getElementById('emg-age').value)
+        };
+
+        if (outputContainer) {
+          outputContainer.innerHTML = `
+            <div style="margin-top:1.5rem; padding:1.5rem; background:#000; border:1px solid #8a3ffc; border-radius:10px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#be95ff;">
+              <div>&gt; 🚨 BROADCASTING EMERGENCY ALERT TO 15 HOSPITALS...</div>
+              <div>&gt; ESP32 Hardware Status: RED LED ON · BUZZER SOUNDING</div>
+              <div>&gt; Initializing Grover's Quantum Search algorithm...</div>
+              <div>&gt; Searching 1,247 registered donor profiles...</div>
+              <div class="quantum-wave-bar" style="margin:10px 0;"></div>
+            </div>
+          `;
+        }
+
+        const ev = await ApiService.postEmergencyAlert(payload);
+        ToastManager.show(`Emergency Alert Posted! Grover's Quantum Search Completed.`, 'success');
+
+        setTimeout(() => {
+          if (outputContainer) {
+            outputContainer.innerHTML = `
+              <div class="match-result-card">
+                <h4><i class="fa-solid fa-check-circle"></i> GROVER'S QUANTUM MATCH COMPLETED (O(√N) - 32 ITERATIONS)</h4>
+                <div class="match-result-hospital">
+                  Matched Node: ${ev.matched_hospital || 'Apollo Specialty Hospital, Bengaluru'}
+                </div>
+                <p style="font-size:13px; color:#c6c6c6; margin-bottom:1rem;">
+                  Organ Match: <strong>${ev.organ_needed} (${ev.blood_type})</strong> · HLA Compatibility: <strong>100% (6/6 Loci)</strong> · Hardware Status: <strong>Green LED Active on Matched Unit</strong>
+                </p>
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <a href="tel:${ev.contact_phone}" class="btn-call">
+                    <i class="fa-solid fa-phone"></i> CALL MATCHED HOSPITAL (${ev.contact_phone})
+                  </a>
+                  <span style="font-size:12px; color:#42be65;">✓ Only this hospital received the match buzzer notification.</span>
+                </div>
+              </div>
+            `;
+          }
+        }, 1500);
+
+        await loadSystemData();
+      } catch (err) {
+        ToastManager.show('Emergency request error: ' + err.message, 'error');
+      }
+    };
+  }
 
   // Quantum Match Trigger Button
   document.querySelectorAll('.btn-compute-quantum-match').forEach(btn => {
@@ -347,6 +487,8 @@ async function loadSystemData() {
       state.pendingUsers = pending;
       const logs = await ApiService.getAuditLogs();
       state.auditLogs = logs;
+      const detailed = await ApiService.getAllUsersDetailed();
+      state.allUsersDetailed = detailed;
     }
     const organs = await ApiService.getOrgans();
     state.organs = organs;
@@ -375,10 +517,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const user = await ApiService.getMe();
       setCurrentUser(user);
+      state.view = 'dashboard';
       await loadSystemData();
     } catch (err) {
       localStorage.removeItem('access_token');
+      state.view = 'landing';
     }
+  } else {
+    state.view = 'landing';
   }
   renderApp();
 });

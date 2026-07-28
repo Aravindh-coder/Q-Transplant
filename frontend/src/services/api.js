@@ -63,6 +63,17 @@ export class ApiService {
     });
   }
 
+  static async getAllUsersDetailed() {
+    return this.request('/users/all-detailed');
+  }
+
+  static async postEmergencyAlert(payload) {
+    return this.request('/emergency/', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
   // Organs & Matching
   static async getOrgans() {
     return this.request('/organs/');

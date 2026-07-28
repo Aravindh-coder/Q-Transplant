@@ -1,6 +1,8 @@
 // Global Application State Manager
 export const state = {
   currentUser: null,
+  view: 'landing', // 'landing' | 'portal-selector' | 'portal-auth' | 'dashboard'
+  activePortal: 'organizer',
   activeTab: 'dashboard',
   theme: localStorage.getItem('theme') || 'dark',
   telemetry: {

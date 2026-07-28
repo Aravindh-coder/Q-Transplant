@@ -10,7 +10,7 @@ from backend.app.core.security import get_password_hash
 from backend.app.core.middleware import RequestLoggingMiddleware
 from backend.app.core.logging import logger
 from backend.app.models.domain import User, UserRole, Hospital, Doctor, Donor, Patient, Organ, Match, GPSLocation, ICUOccupancy, BloodInventory
-from backend.app.routers import auth, users, organs, matches, telemetry, notifications, audit, hospitals, reports, ws
+from backend.app.routers import auth, users, organs, matches, telemetry, notifications, audit, hospitals, reports, ws, emergency
 
 Base.metadata.create_all(bind=engine)
 
@@ -61,6 +61,7 @@ app.include_router(reports.router, prefix=settings.API_V1_STR)
 app.include_router(notifications.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(ws.router, prefix=settings.API_V1_STR)
+app.include_router(emergency.router, prefix=settings.API_V1_STR)
 
 
 @app.on_event("startup")
