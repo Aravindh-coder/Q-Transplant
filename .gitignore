@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+*.db
+*.sqlite3
+test_qtransplant.db
+
+# Node.js / Frontend
+node_modules/
+dist/
+.vite/
+
+# Environment Secrets
+.env
+.env.local
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+
+# PlatformIO / Firmware
+.pio/
+firmware/esp32_organ_box/.pio/

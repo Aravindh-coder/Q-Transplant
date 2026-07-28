@@ -1,0 +1,287 @@
+/* IBM Carbon Design System Tokens & Custom Styling for Q-Transplant */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+:root {
+  /* Carbon g100 Dark Theme (Default) */
+  --cds-background: #161616;
+  --cds-layer-01: #262626;
+  --cds-layer-02: #393939;
+  --cds-layer-03: #525252;
+  --cds-text-01: #f4f4f4;
+  --cds-text-02: #c6c6c6;
+  --cds-text-03: #8d8d8d;
+  --cds-border-subtle: #393939;
+  --cds-border-strong: #6f6f6f;
+  
+  /* Primary & Accent Colors */
+  --cds-interactive-01: #0f62fe; /* Carbon Blue 60 */
+  --cds-interactive-01-hover: #0353e9;
+  --cds-active-primary: #002d9c;
+  --cds-support-success: #198038; /* Green 50 */
+  --cds-support-error: #da1e28;   /* Red 60 */
+  --cds-support-warning: #f1c21b; /* Yellow 30 */
+  --cds-support-info: #0043ce;    /* Blue 70 */
+  --cds-teal-40: #007d79;
+  --cds-cyan-30: #1192e8;
+  --cds-purple-50: #8a3ffc;
+  
+  --cds-font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --cds-mono-font: 'IBM Plex Mono', monospace;
+}
+
+/* Carbon g10 Light Theme Overrides */
+[data-theme="light"] {
+  --cds-background: #f4f4f4;
+  --cds-layer-01: #ffffff;
+  --cds-layer-02: #e0e0e0;
+  --cds-layer-03: #d1d1d1;
+  --cds-text-01: #161616;
+  --cds-text-02: #525252;
+  --cds-text-03: #6f6f6f;
+  --cds-border-subtle: #e0e0e0;
+  --cds-border-strong: #8d8d8d;
+  --cds-interactive-01: #0f62fe;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--cds-background);
+  color: var(--cds-text-01);
+  font-family: var(--cds-font-family);
+  font-size: 14px;
+  line-height: 1.43;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Carbon Header Shell */
+.bx--header {
+  height: 48px;
+  background-color: #161616;
+  border-bottom: 1px solid #393939;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.bx--header__name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #f4f4f4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  letter-spacing: 0.16px;
+}
+
+.bx--header__name span {
+  font-weight: 300;
+  color: #c6c6c6;
+}
+
+.bx--header__global {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Carbon Sidebar */
+.bx--side-nav {
+  width: 240px;
+  background-color: var(--cds-layer-01);
+  border-right: 1px solid var(--cds-border-subtle);
+  position: fixed;
+  top: 48px;
+  bottom: 0;
+  left: 0;
+  z-index: 900;
+  padding-top: 1rem;
+}
+
+.bx--side-nav__items {
+  list-style: none;
+}
+
+.bx--side-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--cds-text-02);
+  text-decoration: none;
+  font-size: 14px;
+  border-left: 4px solid transparent;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.bx--side-nav__link:hover, .bx--side-nav__link.active {
+  background-color: var(--cds-layer-02);
+  color: var(--cds-text-01);
+  border-left-color: var(--cds-interactive-01);
+}
+
+/* App Main Container */
+.bx--content {
+  margin-top: 48px;
+  margin-left: 240px;
+  padding: 2rem;
+  min-height: calc(100vh - 48px);
+}
+
+/* Carbon Grid & Cards */
+.bx--grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+}
+
+.bx--tile {
+  background-color: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle);
+  padding: 1.25rem;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+.bx--tile:hover {
+  border-color: var(--cds-border-strong);
+}
+
+.bx--tile__heading {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.32px;
+  color: var(--cds-text-02);
+  margin-bottom: 0.5rem;
+}
+
+.bx--tile__value {
+  font-size: 2rem;
+  font-weight: 300;
+  color: var(--cds-text-01);
+  font-family: var(--cds-mono-font);
+}
+
+/* Carbon Status Tags */
+.bx--tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.32px;
+}
+
+.bx--tag--green { background-color: rgba(25, 128, 56, 0.2); color: #42be65; border: 1px solid #198038; }
+.bx--tag--red { background-color: rgba(218, 30, 40, 0.2); color: #ff8389; border: 1px solid #da1e28; }
+.bx--tag--yellow { background-color: rgba(241, 194, 27, 0.2); color: #f1c21b; border: 1px solid #f1c21b; }
+.bx--tag--blue { background-color: rgba(15, 98, 254, 0.2); color: #78a9ff; border: 1px solid #0f62fe; }
+
+/* Carbon Data Tables */
+.bx--data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle);
+}
+
+.bx--data-table th {
+  background-color: var(--cds-layer-02);
+  color: var(--cds-text-01);
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cds-border-subtle);
+  font-size: 13px;
+}
+
+.bx--data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cds-border-subtle);
+  color: var(--cds-text-02);
+}
+
+.bx--data-table tr:hover td {
+  background-color: var(--cds-layer-02);
+  color: var(--cds-text-01);
+}
+
+/* Carbon Buttons */
+.bx--btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: background-color 0.15s ease;
+  font-family: inherit;
+  gap: 8px;
+}
+
+.bx--btn--primary {
+  background-color: var(--cds-interactive-01);
+  color: #ffffff;
+}
+
+.bx--btn--primary:hover {
+  background-color: var(--cds-interactive-01-hover);
+}
+
+.bx--btn--secondary {
+  background-color: var(--cds-layer-03);
+  color: #ffffff;
+}
+
+.bx--btn--ghost {
+  background-color: transparent;
+  color: var(--cds-interactive-01);
+}
+
+.bx--btn--ghost:hover {
+  background-color: var(--cds-layer-02);
+}
+
+/* Cold Box Telemetry Code Block */
+.bx--telemetry-box {
+  background-color: #000000;
+  border: 1px solid var(--cds-teal-40);
+  padding: 1rem;
+  font-family: var(--cds-mono-font);
+  color: #00f0ff;
+  border-radius: 4px;
+  position: relative;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+}
+
+/* Live Map Canvas Container */
+#leaflet-map {
+  height: 380px;
+  width: 100%;
+  border: 1px solid var(--cds-border-subtle);
+  background-color: #121212;
+}
+
+/* Responsive Rules */
+@media (max-width: 900px) {
+  .bx--side-nav { width: 60px; }
+  .bx--side-nav__link span { display: none; }
+  .bx--content { margin-left: 60px; padding: 1rem; }
+}

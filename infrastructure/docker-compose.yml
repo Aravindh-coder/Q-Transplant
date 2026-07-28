@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: qtransplant-db
+    environment:
+      POSTGRES_USER: qtransplant
+      POSTGRES_PASSWORD: SecretPostgresPassword2026!
+      POSTGRES_DB: qtransplant_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qtransplant -d qtransplant_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.backend
+    container_name: qtransplant-backend
+    environment:
+      - DATABASE_URL=postgresql://qtransplant:SecretPostgresPassword2026!@postgres:5432/qtransplant_db
+      - JWT_SECRET=super-secret-transplant-key-change-in-production-32-bytes-min!
+      - ENV=production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.frontend
+    container_name: qtransplant-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
