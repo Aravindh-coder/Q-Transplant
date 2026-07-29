@@ -108,6 +108,56 @@ def hardware_emergency_dispatch(payload: dict):
     }
 
 
+@router.post("/donor-available")
+def register_donor_available(payload: dict):
+    """Called when another hospital clicks 'Donor Available Button' (ESP32 GPIO 12 or Web)."""
+    donor_hospital = payload.get("hospital_name", "Fortis Healthcare, Bengaluru")
+    organ_type = payload.get("organ_type", "Heart")
+    blood_type = payload.get("blood_type", "O+")
+    box_id = payload.get("cold_box_id", "BOX-ESP32-001")
+
+    matched_event = None
+    for ev in _emergency_events:
+        if ev["status"] in ["SEARCHING", "CRITICAL", "MATCHED"]:
+            ev["status"] = "DONOR_MATCHED"
+            ev["matched_hospital"] = f"{donor_hospital} (Donor {organ_type} {blood_type} Available via {box_id})"
+            ev["additional_notes"] = f"MATCH CONFIRMED! {donor_hospital} has an available {organ_type} ({blood_type}). Transport Team Dispatched."
+            matched_event = ev
+            break
+
+    if not matched_event and len(_emergency_events) > 0:
+        _emergency_events[0]["status"] = "DONOR_MATCHED"
+        _emergency_events[0]["matched_hospital"] = f"{donor_hospital} (Donor {organ_type} {blood_type} Available)"
+        matched_event = _emergency_events[0]
+
+    return {
+        "status": "DONOR_MATCHED",
+        "donor_hospital": donor_hospital,
+        "organ_type": organ_type,
+        "blood_type": blood_type,
+        "matched_event": matched_event,
+        "message": f"Donor organ availability broadcasted! Recipient hospital received: {donor_hospital}"
+    }
+
+
+@router.post("/acknowledge")
+def acknowledge_emergency(payload: Optional[dict] = None):
+    """Called when hospital crew presses 'Acknowledge Button' (ESP32 GPIO 14). Stops emergency alarm state."""
+    ack_count = 0
+    for ev in _emergency_events:
+        if ev["status"] in ["SEARCHING", "CRITICAL", "DONOR_MATCHED", "MATCHED"]:
+            ev["status"] = "ACKNOWLEDGED"
+            ev["additional_notes"] += " [ACKNOWLEDGED BY HOSPITAL CREW - SIREN STOPPED]"
+            ack_count += 1
+
+    return {
+        "status": "ACKNOWLEDGED",
+        "emergency_stopped": True,
+        "events_acknowledged": ack_count,
+        "message": "Emergency Siren STOPPED & Alert Acknowledged by Hospital Crew!"
+    }
+
+
 @router.get("/", response_model=List[EmergencyOut])
 def list_emergency_alerts(limit: int = 10):
     """Public feed — returns latest emergency organ search events for landing page display."""

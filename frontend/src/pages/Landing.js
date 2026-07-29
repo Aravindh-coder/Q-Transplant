@@ -560,20 +560,35 @@ export async function loadEmergencyFeed() {
 
     if (countEl) countEl.textContent = `${events.filter(e => e.status !== 'CLOSED').length} ACTIVE`;
 
-    container.innerHTML = events.map(ev => `
-      <div class="ticker-item">
-        <div class="ticker-item-left">
-          <h4><i class="fa-solid fa-hospital" style="color:#ff8389;margin-right:6px;"></i>${ev.hospital_name} — ${ev.organ_needed} needed</h4>
-          <p>Blood Type: ${ev.blood_type} · HLA: ${ev.hla_type} · Patient Age: ${ev.patient_age}y · ${ev.hospital_city}</p>
-          ${ev.matched_hospital ? `<p style="color:#42be65;font-size:12px;margin-top:4px;"><i class="fa-solid fa-check-circle"></i> Match: ${ev.matched_hospital}</p>` : ''}
+    container.innerHTML = events.map(ev => {
+      const isMatched = ev.status === 'DONOR_MATCHED' || ev.status === 'MATCHED';
+      const isAck = ev.status === 'ACKNOWLEDGED';
+      const statusColor = isMatched ? '#42be65' : isAck ? '#78a9ff' : '#ff8389';
+
+      return `
+        <div class="ticker-item" style="border-left: 4px solid ${statusColor};">
+          <div class="ticker-item-left">
+            <h4><i class="fa-solid fa-hospital" style="color:${statusColor};margin-right:6px;"></i>${ev.hospital_name} — ${ev.organ_needed} needed</h4>
+            <p>Blood Type: ${ev.blood_type} · HLA: ${ev.hla_type} · Patient Age: ${ev.patient_age}y · ${ev.hospital_city}</p>
+            ${ev.matched_hospital ? `
+              <div style="background:rgba(66,190,101,0.12); border:1px solid #42be65; border-radius:6px; padding:6px 10px; margin-top:6px; color:#42be65; font-size:12px; font-weight:600;">
+                <i class="fa-solid fa-hospital-user"></i> DONOR MATCHED: ${ev.matched_hospital}
+              </div>
+            ` : ''}
+            ${isAck ? `
+              <div style="background:rgba(120,169,255,0.12); border:1px solid #78a9ff; border-radius:6px; padding:6px 10px; margin-top:6px; color:#78a9ff; font-size:12px; font-weight:600;">
+                <i class="fa-solid fa-check-double"></i> ACKNOWLEDGED BY HOSPITAL CREW — Emergency Siren Stopped
+              </div>
+            ` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <span class="ticker-badge ${ev.urgency_level === 'CRITICAL' ? 'badge-critical' : 'badge-searching'}">${ev.urgency_level}</span>
+            <span class="ticker-badge" style="background:${statusColor}; color:#000; font-weight:700;">${ev.status}</span>
+            <span style="font-size:10px;color:#6f6f6f;">${new Date(ev.created_at).toLocaleTimeString()}</span>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-          <span class="ticker-badge ${ev.urgency_level === 'CRITICAL' ? 'badge-critical' : 'badge-searching'}">${ev.urgency_level}</span>
-          <span class="ticker-badge ${ev.status === 'MATCHED' ? 'badge-matched' : ev.status === 'SEARCHING' ? 'badge-searching' : ''}">${ev.status}</span>
-          <span style="font-size:10px;color:#6f6f6f;">${new Date(ev.created_at).toLocaleTimeString()}</span>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   } catch (e) {
     const container = document.getElementById('emergency-feed-items');
     if (container) {
@@ -641,14 +656,63 @@ export function attachLandingEvents(onPortalClick) {
     loadEmergencyFeed();
   }, 2500);
 
-  // Demo ESP32 button interactions
-  document.getElementById('demo-btn-emergency')?.addEventListener('click', () => {
+  // Demo ESP32 BTN 1: Emergency Trigger
+  document.getElementById('demo-btn-emergency')?.addEventListener('click', async () => {
     const oled = document.getElementById('demo-oled');
     if (oled) oled.innerHTML = `&gt; ⚠️ EMERGENCY TRIGGERED!<br>&gt; Broadcasting to 14 hospitals...<br>&gt; Quantum search: INITIALIZING<br>&gt; Algorithm: Grover's O(√N)<br>&gt; Searching 1,247 donors...<br>&gt; _`;
+    
+    try {
+      await fetch('/api/v1/emergency/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cold_box_id: "BOX-ESP32-001",
+          hospital_name: "Apollo Specialty Hospital",
+          organ_type: "Heart",
+          blood_type: "O+"
+        })
+      });
+      await loadEmergencyFeed();
+    } catch (e) { console.error(e); }
+
     setTimeout(() => {
-      if (oled) oled.innerHTML = `&gt; ✅ MATCH FOUND!<br>&gt; Hospital: Apollo, Bengaluru<br>&gt; Donor: O+ | HLA: A2,B7,DR4<br>&gt; Distance: 4.2 km<br>&gt; ETA: 12 minutes<br>&gt; BUZZER: ACTIVATED _`;
+      if (oled) oled.innerHTML = `&gt; ✅ MATCH FOUND!<br>&gt; Hospital: Fortis Healthcare, Bengaluru<br>&gt; Donor: O+ | HLA: A2,B7,DR4<br>&gt; Distance: 4.2 km<br>&gt; ETA: 12 minutes<br>&gt; BUZZER: ACTIVATED _`;
       const greenLed = document.getElementById('demo-led-green');
       if (greenLed) greenLed.style.animation = 'blink-led 0.3s infinite';
-    }, 2500);
+    }, 1500);
+  });
+
+  // Demo ESP32 BTN 2: Donor Available
+  document.querySelector('.hw-btn-donor')?.addEventListener('click', async () => {
+    const oled = document.getElementById('demo-oled');
+    if (oled) oled.innerHTML = `&gt; 💚 DONOR ORGAN AVAILABLE!<br>&gt; Hospital: Fortis Healthcare, Bengaluru<br>&gt; Organ: Heart (O+)<br>&gt; Broadcasting to network...<br>&gt; _`;
+
+    try {
+      const res = await fetch('/api/v1/emergency/donor-available', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hospital_name: "Fortis Healthcare, Bengaluru",
+          organ_type: "Heart",
+          blood_type: "O+",
+          cold_box_id: "BOX-ESP32-001"
+        })
+      });
+      const data = await res.json();
+      await loadEmergencyFeed();
+      alert(`🏥 DONOR AVAILABLE BROADCAST SENT!\n\nDonor Hospital Info Received: ${data.donor_hospital}\nOrgan: ${data.organ_type} (${data.blood_type})`);
+    } catch (e) { console.error(e); }
+  });
+
+  // Demo ESP32 BTN 3: Acknowledged / Reset
+  document.querySelector('.hw-btn-ack')?.addEventListener('click', async () => {
+    const oled = document.getElementById('demo-oled');
+    if (oled) oled.innerHTML = `&gt; ✔ ACKNOWLEDGED BY CREW<br>&gt; Emergency Siren STOPPED<br>&gt; Red LED: OFF<br>&gt; System Normal<br>&gt; _`;
+
+    try {
+      await fetch('/api/v1/emergency/acknowledge', { method: 'POST' });
+      await loadEmergencyFeed();
+      alert("🟢 ACKNOWLEDGED — Emergency Siren STOPPED & Alert Cleared!");
+    } catch (e) { console.error(e); }
   });
 }
