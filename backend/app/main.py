@@ -27,6 +27,11 @@ with engine.connect() as conn:
         conn.commit()
     except Exception:
         pass
+    try:
+        conn.execute(text("ALTER TABLE matches ADD COLUMN match_rationale TEXT;"))
+        conn.commit()
+    except Exception:
+        pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
