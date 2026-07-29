@@ -740,10 +740,3 @@ export function attachLandingEvents(onPortalClick) {
     } catch(e) { console.error(e); }
   });
 }
-
-  try {
-    const res = await fetch('/api/v1/emergency/?limit=8');
-    if (!res.ok) throw new Error('No data');
-    const events = await res.json();
-
-
