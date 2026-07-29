@@ -1,29 +1,48 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// WiFi Access Point Credentials
-#define WIFI_SSID "QTRANSPLANT_DISPATCH_NET"
-#define WIFI_PASS "TransplantSecure2026!"
+// ==============================================================================
+// Q-TRANSPLANT ESP32 DEVKIT HARDWARE CONFIGURATION & PIN MAPPING
+// ==============================================================================
 
-// Q-Transplant Backend API Telemetry Endpoint
-#define BACKEND_HOST "http://192.168.1.100:8000"
+// WiFi Credentials (Update with your local Wi-Fi SSID and Password)
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+
+// Q-Transplant Server Host IP (Replace with your laptop/server IP address)
+#define BACKEND_HOST "http://192.168.1.100:8080"  // e.g. http://192.168.1.50:8080
+
+// API Endpoints
 #define TELEMETRY_ENDPOINT "/api/v1/telemetry/push"
-#define SOS_ENDPOINT "/api/v1/telemetry/emergency-trigger"
+#define EMERGENCY_ENDPOINT "/api/v1/emergency/dispatch"
+#define MATCH_ENDPOINT     "/api/v1/matches/"
 
-// Cold Box Identification & Sensor Pins
+// Cold Box Unique Identification
 #define COLD_BOX_ID "BOX-ESP32-001"
-#define DHTPIN 4
-#define DHTTYPE DHT22
-#define GPS_RX_PIN 16
-#define GPS_TX_PIN 17
-#define SOS_BUTTON_PIN 0       // BOOT button doubles as SOS
-#define LED_ALARM_PIN 2        // Onboard LED for alarm state
 
-// Safe Temperature Threshold
-#define TEMP_MIN_OK 2.0
-#define TEMP_MAX_OK 8.0
+// ------------------------------------------------------------------------------
+// EXACT HARDWARE PIN MAPPINGS
+// ------------------------------------------------------------------------------
+#define OLED_SDA_PIN    21  // OLED I2C Data
+#define OLED_SCL_PIN    22  // OLED I2C Clock
+#define OLED_RESET      -1  // Reset pin (-1 if sharing ESP32 reset)
+#define SCREEN_WIDTH   128  // OLED display width in pixels
+#define SCREEN_HEIGHT   64  // OLED display height in pixels
+#define OLED_I2C_ADDR 0x3C  // Standard I2C address for SSD1306
 
-// Telemetry Polling Interval (milliseconds)
-#define TELEMETRY_INTERVAL_MS 5000
+// Buttons (INPUT_PULLUP: Pressed = LOW)
+#define BTN_EMERGENCY   13  // Red Emergency Button
+#define BTN_DONOR       12  // Blue/Yellow Donor Available Button
+#define BTN_ACKNOWLEGE  14  // White/Green Acknowledge Button
+
+// Actuators & Indicators
+#define LED_GREEN       18  // Green System Status LED
+#define LED_RED         19  // Red Alert / Alarm LED
+#define BUZZER_PIN      23  // Active Buzzer
+
+// Telemetry Timing & Thresholds
+#define TELEMETRY_INTERVAL_MS 4000  // Push telemetry every 4 seconds
+#define TEMP_SAFE_MIN 2.0
+#define TEMP_SAFE_MAX 8.0
 
 #endif // CONFIG_H
