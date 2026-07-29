@@ -239,6 +239,30 @@ function renderDoctorRegFields() {
       <input type="text" id="portal-reg-dept" required placeholder="Organ Transplantation Unit" />
     </div>
 
+    <!-- Donor Data File Upload -->
+    <div class="form-group">
+      <label>Donor Data File <span style="color:#0f62fe;font-size:10px;font-weight:600;">(OPTIONAL / BATCH)</span></label>
+      <div class="cert-upload-zone" id="donor-upload-zone" onclick="document.getElementById('donor-data-file-input').click()">
+        <div class="icon"><i class="fa-solid fa-hand-holding-medical" style="color:#0f62fe;"></i></div>
+        <h4 style="font-size:13px;">Upload Donor Dataset</h4>
+        <p>CSV, JSON, XLSX — Max 10MB</p>
+      </div>
+      <input type="file" id="donor-data-file-input" accept=".csv,.json,.xlsx,.xls" style="display:none;" />
+      <div id="donor-data-file-name" style="font-size:11px;color:#8d8d8d;margin-top:4px;"></div>
+    </div>
+
+    <!-- Recipient Data File Upload -->
+    <div class="form-group">
+      <label>Recipient / Patient Data File <span style="color:#8a3ffc;font-size:10px;font-weight:600;">(OPTIONAL / BATCH)</span></label>
+      <div class="cert-upload-zone" id="recipient-upload-zone" onclick="document.getElementById('recipient-data-file-input').click()">
+        <div class="icon"><i class="fa-solid fa-user-injured" style="color:#8a3ffc;"></i></div>
+        <h4 style="font-size:13px;">Upload Recipient Dataset</h4>
+        <p>CSV, JSON, XLSX — Max 10MB</p>
+      </div>
+      <input type="file" id="recipient-data-file-input" accept=".csv,.json,.xlsx,.xls" style="display:none;" />
+      <div id="recipient-data-file-name" style="font-size:11px;color:#8d8d8d;margin-top:4px;"></div>
+    </div>
+
     <!-- Medical Certificate Upload + AI Verification -->
     <div class="form-group">
       <label>Medical Certificate <span style="color:#8a3ffc;font-size:10px;font-weight:600;">(AI VERIFIED)</span></label>

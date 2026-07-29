@@ -113,14 +113,14 @@ def quick_approve_or_reject_via_email(
         <head><title>Q-Transplant - User {status_str}</title></head>
         <body>
             <div style="max-width: 550px; margin: 0 auto; background: #262626; border-top: 4px solid {color}; padding: 35px; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-                <h2 style="color: {color}; margin-top: 0;">Doctor Registration {status_str}</h2>
-                <p style="font-size: 16px;">Action successfully executed for <strong>Dr. {user.full_name}</strong> ({user.email}).</p>
+                <h2 style="color: {color}; margin-top: 0;">User Registration {status_str}</h2>
+                <p style="font-size: 16px;">Action successfully executed for <strong>{user.full_name}</strong> ({user.email}).</p>
                 <div style="background: #161616; padding: 15px; border-left: 3px solid {color}; margin: 20px 0;">
                     <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: {color}; font-weight: bold;">{status_str}</span></p>
                     <p style="margin: 4px 0;"><strong>Role:</strong> {user.role.upper()}</p>
                     <p style="margin: 4px 0;"><strong>Notification Email:</strong> Dispatched to {user.email}</p>
                 </div>
-                <p>The doctor's account state has been updated live in the database.</p>
+                <p>The applicant's account state has been updated live in the database.</p>
                 <div style="margin-top: 25px;">
                     <a href="http://localhost:5174" style="background-color: #0f62fe; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 2px;">RETURN TO ORGANIZER DASHBOARD</a>
                 </div>

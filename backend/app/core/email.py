@@ -85,6 +85,23 @@ class EmailService:
 
     @classmethod
     def send_verification_request_to_organizer(cls, user_id: int, name: str, email: str, spec: str, license_num: str, dept: str, phone: str, avatar_url: Optional[str] = None, base_url: str = "http://localhost:8080"):
+        return cls.send_generic_verification_request(
+            user_id=user_id,
+            name=name,
+            email=email,
+            role="doctor",
+            details={
+                "Medical License": license_num,
+                "Specialization": spec,
+                "Department": dept,
+                "Phone": phone
+            },
+            avatar_url=avatar_url,
+            base_url=base_url
+        )
+
+    @classmethod
+    def send_generic_verification_request(cls, user_id: int, name: str, email: str, role: str, details: dict, avatar_url: Optional[str] = None, base_url: str = "http://localhost:8080"):
         token = cls.generate_quick_approval_token(user_id)
         approve_url = f"{base_url}/api/v1/users/quick-approve?user_id={user_id}&approve=true&token={token}"
         reject_url = f"{base_url}/api/v1/users/quick-approve?user_id={user_id}&approve=false&token={token}"
@@ -97,33 +114,33 @@ class EmailService:
                 full_img_url = avatar_url
             photo_html = f"""
             <div style="margin-bottom: 20px; text-align: center;">
-                <img src="{full_img_url}" alt="Doctor Photo" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0f62fe; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" />
-                <p style="font-size: 12px; color: #8d8d8d; margin-top: 5px;">Live Verification Snapshot</p>
+                <img src="{full_img_url}" alt="Verification Photo" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0f62fe; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" />
+                <p style="font-size: 12px; color: #8d8d8d; margin-top: 5px;">AI Identity & Document Verification Snapshot</p>
             </div>
             """
 
-        subject = f"URGENT VERIFICATION REQUEST: Dr. {name} (License: {license_num})"
+        details_html = "".join([f'<p style="margin: 4px 0;"><strong>{k}:</strong> {v}</p>' for k, v in details.items()])
+
+        subject = f"URGENT APPROVAL REQUEST: {role.upper()} - {name} ({email})"
         body = f"""
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #f4f4f4; background-color: #161616;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #262626; border-top: 4px solid #f1c21b; padding: 30px;">
                 <h2 style="color: #f1c21b; margin-top: 0;">Organizer Verification Required</h2>
-                <p>A new Doctor registration requires executive approval before granting access to organ matching registries.</p>
+                <p>A new <strong>{role.upper()}</strong> registration requires executive approval before access is granted to organ registries.</p>
                 
                 {photo_html}
 
                 <div style="background-color: #161616; padding: 15px; border-left: 3px solid #0f62fe; margin-bottom: 20px;">
-                    <p style="margin: 4px 0;"><strong>Doctor Name:</strong> Dr. {name}</p>
+                    <p style="margin: 4px 0;"><strong>Applicant Name:</strong> {name}</p>
+                    <p style="margin: 4px 0;"><strong>Role Requested:</strong> {role.upper()}</p>
                     <p style="margin: 4px 0;"><strong>Email Address:</strong> {email}</p>
-                    <p style="margin: 4px 0;"><strong>Medical License:</strong> {license_num}</p>
-                    <p style="margin: 4px 0;"><strong>Specialization:</strong> {spec}</p>
-                    <p style="margin: 4px 0;"><strong>Department:</strong> {dept}</p>
-                    <p style="margin: 4px 0;"><strong>Contact Phone:</strong> {phone}</p>
+                    {details_html}
                 </div>
 
                 <p style="margin-bottom: 20px; font-weight: bold;">One-Click Executive Action Buttons:</p>
                 <div style="display: flex; gap: 15px; margin-bottom: 25px;">
                     <a href="{approve_url}" target="_blank" style="background-color: #24a148; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">
-                        ✔ APPROVE DOCTOR
+                        ✔ APPROVE {role.upper()}
                     </a>
                     <a href="{reject_url}" target="_blank" style="background-color: #da1e28; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block; margin-left: 10px;">
                         ✖ REJECT REGISTRATION

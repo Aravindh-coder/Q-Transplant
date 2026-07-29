@@ -312,6 +312,30 @@ function attachPortalAuthEvents() {
     };
   }
 
+  // Donor dataset file upload handler
+  const donorFileInput = document.getElementById('donor-data-file-input');
+  const donorFileName = document.getElementById('donor-data-file-name');
+  if (donorFileInput) {
+    donorFileInput.onchange = () => {
+      if (donorFileInput.files.length > 0) {
+        if (donorFileName) donorFileName.textContent = `Attached Donor File: ${donorFileInput.files[0].name}`;
+        ToastManager.show(`Donor data file attached: ${donorFileInput.files[0].name}`, 'info');
+      }
+    };
+  }
+
+  // Recipient dataset file upload handler
+  const recipientFileInput = document.getElementById('recipient-data-file-input');
+  const recipientFileName = document.getElementById('recipient-data-file-name');
+  if (recipientFileInput) {
+    recipientFileInput.onchange = () => {
+      if (recipientFileInput.files.length > 0) {
+        if (recipientFileName) recipientFileName.textContent = `Attached Recipient File: ${recipientFileInput.files[0].name}`;
+        ToastManager.show(`Recipient data file attached: ${recipientFileInput.files[0].name}`, 'info');
+      }
+    };
+  }
+
   // Submit Login
   if (formLogin) {
     formLogin.onsubmit = async (e) => {

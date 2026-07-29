@@ -91,17 +91,41 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
     # Send Ack Email to registrant
     EmailService.send_registration_ack(user.email, user.full_name, user.role)
 
-    # If Doctor, send verification request with One-Click Approve / Reject links to Organizer
-    if payload.role.lower() == "doctor" and doc_profile:
-        EmailService.send_verification_request_to_organizer(
+    # Send verification request with One-Click Approve / Reject links to Organizer for all roles requiring approval
+    if payload.role.lower() != "organizer":
+        details = {}
+        if payload.role.lower() == "doctor" and doc_profile:
+            details = {
+                "Medical License": doc_profile.medical_license,
+                "Specialization": doc_profile.specialization,
+                "Department": doc_profile.department,
+                "Phone": user.phone or doc_profile.phone
+            }
+        elif payload.role.lower() == "hospital":
+            details = {
+                "License Number": payload.license_number or f"LIC-{user.id:04d}",
+                "City / State": f"{payload.city or 'Bengaluru'}, {payload.state or 'Karnataka'}",
+                "Address": payload.address or "Main Medical Square",
+                "Phone": payload.phone or "080-555-0199"
+            }
+        elif payload.role.lower() == "donor":
+            details = {
+                "Blood Type": payload.blood_type or "O+",
+                "HLA Type": payload.hla_type or "A2,B7,DR4",
+                "Age": str(payload.age or 35),
+                "Gender": payload.gender or "Male",
+                "Phone": payload.phone or "080-555-0100"
+            }
+        else:
+            details = {"Phone": payload.phone or "N/A"}
+
+        EmailService.send_generic_verification_request(
             user_id=user.id,
             name=user.full_name,
             email=user.email,
-            spec=doc_profile.specialization,
-            license_num=doc_profile.medical_license,
-            dept=doc_profile.department,
-            phone=user.phone or doc_profile.phone,
-            avatar_url=getattr(doc_profile, 'avatar_url', None)
+            role=user.role,
+            details=details,
+            avatar_url=getattr(doc_profile, 'avatar_url', None) if doc_profile else None
         )
 
     return user
