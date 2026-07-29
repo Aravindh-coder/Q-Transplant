@@ -326,3 +326,66 @@ class OperationTheatre(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     hospital = relationship("Hospital", back_populates="operation_theatres")
+
+
+class TransplantPrediction(Base):
+    __tablename__ = "transplant_predictions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    organ_type = Column(String(50), nullable=False)
+    patient_age = Column(Integer, nullable=False)
+    blood_type = Column(String(10), nullable=False)
+    hla_type = Column(String(100), nullable=False)
+    creatinine = Column(Float, default=1.1)
+    cold_ischemia_hours = Column(Float, default=4.0)
+    distance_km = Column(Float, default=15.0)
+    icu_available = Column(Boolean, default=True)
+    bmi = Column(Float, default=24.5)
+    comorbidities_count = Column(Integer, default=0)
+    one_year_survival = Column(Float, nullable=False)
+    five_year_survival = Column(Float, nullable=False)
+    rejection_probability = Column(Float, nullable=False)
+    mortality_risk = Column(Float, nullable=False)
+    overall_success = Column(Float, nullable=False)
+    confidence_score = Column(Float, nullable=False)
+    shap_explanation = Column(Text, nullable=True)
+    model_used = Column(String(50), default="XGBoost & LightGBM Ensemble")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class BlockchainBlock(Base):
+    __tablename__ = "blockchain_ledger"
+
+    index = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    actor = Column(String(255), nullable=False)
+    hospital = Column(String(255), nullable=False)
+    action = Column(String(100), nullable=False)
+    details = Column(Text, nullable=True)
+    prev_hash = Column(String(64), nullable=False)
+    hash = Column(String(64), nullable=False, unique=True)
+    digital_signature = Column(String(255), nullable=False)
+
+
+class FederatedSession(Base):
+    __tablename__ = "federated_sessions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    round_number = Column(Integer, nullable=False)
+    global_accuracy = Column(Float, nullable=False)
+    global_loss = Column(Float, nullable=False)
+    hospitals_participated = Column(Integer, default=4)
+    weights_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AgentLog(Base):
+    __tablename__ = "agent_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    agent_name = Column(String(50), nullable=False)
+    recipient_agent = Column(String(50), nullable=False)
+    action = Column(String(100), nullable=False)
+    message = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+

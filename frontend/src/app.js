@@ -16,6 +16,15 @@ import { renderDashboardPatient } from './pages/DashboardPatient.js';
 
 import { renderQuantumMatchView, attachQuantumMatchEvents } from './pages/QuantumMatchView.js';
 import { renderTelemetryGauge } from './components/TelemetryGauge.js';
+import { renderAIPredictionView, attachAIPredictionEvents } from './pages/AIPredictionView.js';
+import { renderDigitalTwinView, attachDigitalTwinEvents } from './pages/DigitalTwinView.js';
+import {
+  renderBlockchainView, attachBlockchainEvents,
+  renderFederatedLearningView, attachFederatedLearningEvents,
+  renderMultiAgentView, attachMultiAgentEvents,
+  renderResearchAnalyticsView, attachResearchAnalyticsEvents,
+  renderSyntheticDataView, attachSyntheticDataEvents
+} from './pages/AdvancedDashboards.js';
 
 let wsConnection = null;
 
@@ -97,6 +106,16 @@ function renderApp() {
   if (state.activeTab === 'dashboard' || state.activeTab === 'telemetry') {
     initLiveMap(state.telemetry.lat, state.telemetry.lng);
   }
+
+  // Attach AI platform view event listeners based on activeTab
+  if (state.activeTab === 'ai-predict') attachAIPredictionEvents();
+  if (state.activeTab === 'digital-twin') attachDigitalTwinEvents();
+  if (state.activeTab === 'blockchain') attachBlockchainEvents();
+  if (state.activeTab === 'federated') attachFederatedLearningEvents();
+  if (state.activeTab === 'multi-agent') attachMultiAgentEvents();
+  if (state.activeTab === 'analytics') attachResearchAnalyticsEvents();
+  if (state.activeTab === 'synthetic') attachSyntheticDataEvents();
+  if (state.activeTab === 'matching') attachQuantumMatchEvents();
 
   attachAIAssistantEvents();
 }
@@ -211,6 +230,14 @@ function renderActiveTab() {
   if (tab === 'matching') {
     return renderQuantumMatchView();
   }
+
+  if (tab === 'ai-predict') return renderAIPredictionView();
+  if (tab === 'digital-twin') return renderDigitalTwinView();
+  if (tab === 'blockchain') return renderBlockchainView();
+  if (tab === 'federated') return renderFederatedLearningView();
+  if (tab === 'multi-agent') return renderMultiAgentView();
+  if (tab === 'analytics') return renderResearchAnalyticsView();
+  if (tab === 'synthetic') return renderSyntheticDataView();
 
   if (tab === 'telemetry') {
     const telemetry = state.telemetry;
