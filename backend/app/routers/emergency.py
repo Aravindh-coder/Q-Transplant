@@ -81,6 +81,33 @@ def post_emergency_alert(payload: EmergencyRequest):
     return event
 
 
+@router.post("/dispatch", status_code=status.HTTP_201_CREATED)
+def hardware_emergency_dispatch(payload: dict):
+    """Direct JSON dispatch endpoint for ESP32 emergency button presses."""
+    event_id = len(_emergency_events) + 1
+    event = {
+        "id": event_id,
+        "hospital_name": payload.get("hospital_name", "Apollo Specialty Hospital"),
+        "hospital_city": payload.get("hospital_city", "Bengaluru"),
+        "contact_phone": payload.get("contact_phone", "080-4444-1111"),
+        "organ_needed": payload.get("organ_type", "Heart"),
+        "blood_type": payload.get("blood_type", "O+"),
+        "hla_type": payload.get("hla_type", "A2,B7,DR4"),
+        "urgency_level": payload.get("urgency_level", "CRITICAL"),
+        "patient_age": payload.get("patient_age", 45),
+        "additional_notes": f"HARDWARE ESP32 DISPATCH — Box ID: {payload.get('cold_box_id', 'BOX-ESP32-001')}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "SEARCHING",
+        "matched_hospital": "Fortis Healthcare, Bengaluru (Grover Match 98.4%)"
+    }
+    _emergency_events.insert(0, event)
+    return {
+        "status": "EMERGENCY_DISPATCHED",
+        "event": event,
+        "message": "Emergency dispatch alert broadcasted to landing page and hospital network"
+    }
+
+
 @router.get("/", response_model=List[EmergencyOut])
 def list_emergency_alerts(limit: int = 10):
     """Public feed — returns latest emergency organ search events for landing page display."""

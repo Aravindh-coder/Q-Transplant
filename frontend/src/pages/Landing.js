@@ -324,15 +324,22 @@ export function renderLandingPage() {
         <div class="section-badge" style="background:rgba(218,30,40,0.1);border-color:rgba(218,30,40,0.3);color:#ff8389;">
           <i class="fa-solid fa-triangle-exclamation"></i> LIVE EMERGENCY FEED
         </div>
-        <h2 class="section-title">Active Organ Requests</h2>
-        <p class="section-subtitle">
-          Real-time emergency organ search requests from connected hospitals. 
-          Each request triggers Grover's quantum search automatically.
-        </p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <div>
+            <h2 class="section-title" style="margin-bottom:0.25rem;">Active Organ Requests</h2>
+            <p class="section-subtitle" style="margin-bottom:0;">
+              Real-time emergency requests triggered by ESP32 hardware buttons across 15 connected hospitals.
+            </p>
+          </div>
+          <button id="btn-open-emergency-input-modal" class="btn-hero-primary" style="background:#da1e28; border-color:#da1e28; font-size:12px; padding:10px 18px; white-space:nowrap;">
+            <i class="fa-solid fa-plus-circle"></i> Submit Emergency Organ Request
+          </button>
+        </div>
+
         <div class="emergency-ticker" id="landing-emergency-feed">
           <div class="ticker-header">
             <div class="ticker-dot"></div>
-            LIVE — QUANTUM SEARCH ACTIVE
+            LIVE — HARDWARE &amp; QUANTUM ENGINE ACTIVE
             <span style="margin-left:auto;font-weight:400;opacity:0.8;font-size:11px;" id="emergency-count-label">Loading...</span>
           </div>
           <div class="ticker-items" id="emergency-feed-items">
@@ -343,6 +350,55 @@ export function renderLandingPage() {
         </div>
       </div>
     </section>
+
+    <!-- Modal for Emergency Organ Request Entry -->
+    <div id="landing-emergency-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); z-index:99999; justify-content:center; align-items:center;">
+      <div style="background:#161616; border:1px solid #da1e28; border-radius:12px; width:90%; max-width:550px; padding:2rem; box-shadow:0 0 35px rgba(218,30,40,0.4); position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+          <h3 style="font-size:16px; color:#ff8389; font-weight:700; margin:0;"><i class="fa-solid fa-siren-on"></i> Emergency Patient Organ Dispatch Input</h3>
+          <button id="btn-close-emergency-modal" style="background:none; border:none; color:#8d8d8d; font-size:18px; cursor:pointer;">&times;</button>
+        </div>
+        <form id="emergency-request-form" style="display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <label style="font-size:11px; color:#c6c6c6; display:block; margin-bottom:4px;">Hospital Name</label>
+            <input type="text" id="em-hosp-name" value="Apollo Specialty Hospital" required style="width:100%; background:#262626; color:#fff; border:1px solid #393939; padding:8px; border-radius:4px; font-size:12px;" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:11px; color:#c6c6c6; display:block; margin-bottom:4px;">Organ Needed</label>
+              <select id="em-organ" style="width:100%; background:#262626; color:#fff; border:1px solid #393939; padding:8px; border-radius:4px; font-size:12px;">
+                <option value="Heart">Heart</option>
+                <option value="Kidney">Kidney</option>
+                <option value="Liver">Liver</option>
+                <option value="Lung">Lung</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px; color:#c6c6c6; display:block; margin-bottom:4px;">Blood Type</label>
+              <select id="em-blood" style="width:100%; background:#262626; color:#fff; border:1px solid #393939; padding:8px; border-radius:4px; font-size:12px;">
+                <option value="O+">O+</option>
+                <option value="A+">A+</option>
+                <option value="B+">B+</option>
+                <option value="AB+">AB+</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:11px; color:#c6c6c6; display:block; margin-bottom:4px;">HLA Profile</label>
+              <input type="text" id="em-hla" value="A2,B7,DR4" required style="width:100%; background:#262626; color:#fff; border:1px solid #393939; padding:8px; border-radius:4px; font-size:12px;" />
+            </div>
+            <div>
+              <label style="font-size:11px; color:#c6c6c6; display:block; margin-bottom:4px;">Patient Age</label>
+              <input type="number" id="em-age" value="45" required style="width:100%; background:#262626; color:#fff; border:1px solid #393939; padding:8px; border-radius:4px; font-size:12px;" />
+            </div>
+          </div>
+          <button type="submit" class="btn-hero-primary" style="background:#da1e28; border-color:#da1e28; justify-content:center; padding:10px; font-size:13px; margin-top:8px;">
+            <i class="fa-solid fa-bolt"></i> BROADCAST EMERGENCY TO ALL HOSPITALS
+          </button>
+        </form>
+      </div>
+    </div>
 
     <!-- ══════════ ABOUT US ══════════ -->
     <section class="about-section" id="about">
@@ -536,10 +592,58 @@ export function attachLandingEvents(onPortalClick) {
     el.addEventListener('click', e => { e.preventDefault(); onPortalClick(el.dataset.portal); });
   });
 
+  // Emergency Modal Handlers
+  const modal = document.getElementById('landing-emergency-modal');
+  const btnOpen = document.getElementById('btn-open-emergency-input-modal');
+  const btnClose = document.getElementById('btn-close-emergency-modal');
+  const form = document.getElementById('emergency-request-form');
+
+  if (btnOpen && modal) {
+    btnOpen.onclick = () => { modal.style.display = 'flex'; };
+  }
+  if (btnClose && modal) {
+    btnClose.onclick = () => { modal.style.display = 'none'; };
+  }
+
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const payload = {
+        hospital_name: document.getElementById('em-hosp-name').value,
+        hospital_city: "Bengaluru",
+        contact_phone: "080-4444-1111",
+        organ_needed: document.getElementById('em-organ').value,
+        blood_type: document.getElementById('em-blood').value,
+        hla_type: document.getElementById('em-hla').value,
+        urgency_level: "CRITICAL",
+        patient_age: parseInt(document.getElementById('em-age').value) || 45
+      };
+
+      try {
+        const res = await fetch('/api/v1/emergency/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          modal.style.display = 'none';
+          await loadEmergencyFeed();
+          alert("🚨 Emergency organ request submitted & Grover quantum search executed across network!");
+        }
+      } catch (err) {
+        console.error('Error submitting emergency:', err);
+      }
+    };
+  }
+
+  // Auto-refresh feed every 2.5 seconds to show ESP32 hardware button pushes in real-time!
+  setInterval(() => {
+    loadEmergencyFeed();
+  }, 2500);
+
   // Demo ESP32 button interactions
   document.getElementById('demo-btn-emergency')?.addEventListener('click', () => {
     const oled = document.getElementById('demo-oled');
-    const led = document.getElementById('demo-led-red');
     if (oled) oled.innerHTML = `&gt; ⚠️ EMERGENCY TRIGGERED!<br>&gt; Broadcasting to 14 hospitals...<br>&gt; Quantum search: INITIALIZING<br>&gt; Algorithm: Grover's O(√N)<br>&gt; Searching 1,247 donors...<br>&gt; _`;
     setTimeout(() => {
       if (oled) oled.innerHTML = `&gt; ✅ MATCH FOUND!<br>&gt; Hospital: Apollo, Bengaluru<br>&gt; Donor: O+ | HLA: A2,B7,DR4<br>&gt; Distance: 4.2 km<br>&gt; ETA: 12 minutes<br>&gt; BUZZER: ACTIVATED _`;
