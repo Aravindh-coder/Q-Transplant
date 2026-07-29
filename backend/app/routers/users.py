@@ -155,3 +155,48 @@ def approve_or_reject_user(
 
     EmailService.send_approval_status(user.email, user.full_name, action.approve, action.reason or "")
     return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_token: dict = Depends(RoleChecker(["organizer"]))
+):
+    """Allows Organizer to permanently remove a Doctor or User profile."""
+    repo = UserRepository(db)
+    audit = AuditRepository(db)
+
+    user = repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Target user not found.")
+
+    if user.role.lower() == "organizer":
+        raise HTTPException(status_code=400, detail="Cannot delete organizer admin user.")
+
+    email = user.email
+    name = user.full_name
+    role = user.role
+
+    from backend.app.models.domain import User, Doctor, Hospital, Donor, Patient
+    if role.lower() == "doctor":
+        db.query(Doctor).filter(Doctor.user_id == user_id).delete()
+    elif role.lower() == "hospital":
+        db.query(Hospital).filter(Hospital.user_id == user_id).delete()
+    elif role.lower() == "donor":
+        db.query(Donor).filter(Donor.user_id == user_id).delete()
+    elif role.lower() == "patient":
+        db.query(Patient).filter(Patient.user_id == user_id).delete()
+
+    db.query(User).filter(User.id == user_id).delete()
+    db.commit()
+
+    admin_id = int(current_token.get("sub", 1))
+    audit.log_action(
+        user_id=admin_id,
+        action="DELETE_USER",
+        resource="User",
+        details=f"Organizer removed {role} user: {name} ({email})"
+    )
+
+    return {"message": f"Successfully removed {role} {name} ({email}) from system.", "user_id": user_id}

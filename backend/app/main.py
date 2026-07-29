@@ -10,7 +10,7 @@ from backend.app.core.security import get_password_hash
 from backend.app.core.middleware import RequestLoggingMiddleware
 from backend.app.core.logging import logger
 from backend.app.models.domain import User, UserRole, Hospital, Doctor, Donor, Patient, Organ, Match, GPSLocation, ICUOccupancy, BloodInventory
-from backend.app.routers import auth, users, organs, matches, telemetry, notifications, audit, hospitals, reports, ws, emergency
+from backend.app.routers import auth, users, organs, matches, telemetry, notifications, audit, hospitals, reports, ws, emergency, gis, coordinator
 from backend.app.routers import ai as ai_router
 
 Base.metadata.create_all(bind=engine)
@@ -29,6 +29,11 @@ with engine.connect() as conn:
         pass
     try:
         conn.execute(text("ALTER TABLE matches ADD COLUMN match_rationale TEXT;"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE donors ADD COLUMN qr_code_token VARCHAR(100);"))
         conn.commit()
     except Exception:
         pass
@@ -69,6 +74,8 @@ app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(ws.router, prefix=settings.API_V1_STR)
 app.include_router(emergency.router, prefix=settings.API_V1_STR)
 app.include_router(ai_router.router, prefix=settings.API_V1_STR)
+app.include_router(gis.router, prefix=settings.API_V1_STR)
+app.include_router(coordinator.router, prefix=settings.API_V1_STR)
 
 
 @app.on_event("startup")

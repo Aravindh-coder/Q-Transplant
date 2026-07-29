@@ -88,37 +88,47 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
 
     audit.log_action(user_id=user.id, action="REGISTER", resource="User", details=f"Registered role {user.role}")
 
-    # Send Ack Email to registrant
-    EmailService.send_registration_ack(user.email, user.full_name, user.role)
+    details = {}
+    if payload.role.lower() == "doctor" and doc_profile:
+        details = {
+            "Full Name": user.full_name,
+            "Email Address": user.email,
+            "Medical License": doc_profile.medical_license,
+            "Specialization": doc_profile.specialization,
+            "Department": doc_profile.department,
+            "Phone": user.phone or doc_profile.phone
+        }
+    elif payload.role.lower() == "hospital":
+        details = {
+            "Full Name": user.full_name,
+            "Email Address": user.email,
+            "License Number": payload.license_number or f"LIC-{user.id:04d}",
+            "City / State": f"{payload.city or 'Bengaluru'}, {payload.state or 'Karnataka'}",
+            "Address": payload.address or "Main Medical Square",
+            "Phone": payload.phone or "080-555-0199"
+        }
+    elif payload.role.lower() == "donor":
+        details = {
+            "Full Name": user.full_name,
+            "Email Address": user.email,
+            "Blood Type": payload.blood_type or "O+",
+            "HLA Type": payload.hla_type or "A2,B7,DR4",
+            "Age": str(payload.age or 35),
+            "Gender": payload.gender or "Male",
+            "Phone": payload.phone or "080-555-0100"
+        }
+    else:
+        details = {
+            "Full Name": user.full_name,
+            "Email Address": user.email,
+            "Phone": payload.phone or "N/A"
+        }
 
-    # Send verification request with One-Click Approve / Reject links to Organizer for all roles requiring approval
+    # Send Ack Email to registrant with all entered details
+    EmailService.send_registration_ack(user.email, user.full_name, user.role, details)
+
+    # Send verification request with One-Click Approve / Reject links to Organizer
     if payload.role.lower() != "organizer":
-        details = {}
-        if payload.role.lower() == "doctor" and doc_profile:
-            details = {
-                "Medical License": doc_profile.medical_license,
-                "Specialization": doc_profile.specialization,
-                "Department": doc_profile.department,
-                "Phone": user.phone or doc_profile.phone
-            }
-        elif payload.role.lower() == "hospital":
-            details = {
-                "License Number": payload.license_number or f"LIC-{user.id:04d}",
-                "City / State": f"{payload.city or 'Bengaluru'}, {payload.state or 'Karnataka'}",
-                "Address": payload.address or "Main Medical Square",
-                "Phone": payload.phone or "080-555-0199"
-            }
-        elif payload.role.lower() == "donor":
-            details = {
-                "Blood Type": payload.blood_type or "O+",
-                "HLA Type": payload.hla_type or "A2,B7,DR4",
-                "Age": str(payload.age or 35),
-                "Gender": payload.gender or "Male",
-                "Phone": payload.phone or "080-555-0100"
-            }
-        else:
-            details = {"Phone": payload.phone or "N/A"}
-
         EmailService.send_generic_verification_request(
             user_id=user.id,
             name=user.full_name,
@@ -217,6 +227,12 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated. Please contact support."
+        )
+
+    if user.role.lower() != "organizer" and not user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is pending review and approval by the organizer (aravindhjoshua10@gmail.com). You will receive an email once approved."
         )
 
     access_token = create_access_token(subject=user.id, role=user.role)

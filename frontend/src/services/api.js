@@ -63,6 +63,12 @@ export class ApiService {
     });
   }
 
+  static async deleteUser(userId) {
+    return this.request(`/users/${userId}`, {
+      method: 'DELETE'
+    });
+  }
+
   static async getAllUsersDetailed() {
     return this.request('/users/all-detailed');
   }

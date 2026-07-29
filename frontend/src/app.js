@@ -26,6 +26,11 @@ import {
   renderSyntheticDataView, attachSyntheticDataEvents
 } from './pages/AdvancedDashboards.js';
 
+import { renderNationalCommandCenterView, attachNationalCommandCenterEvents } from './pages/NationalCommandCenter.js';
+import { renderAICoordinatorView, attachAICoordinatorEvents } from './pages/AICoordinator.js';
+import { renderLiveTrackingView, attachLiveTrackingEvents } from './pages/LiveTrackingView.js';
+import { renderDocumentationView, attachDocumentationEvents } from './pages/DocumentationView.js';
+
 let wsConnection = null;
 
 function initWebSocket() {
@@ -108,6 +113,10 @@ function renderApp() {
   }
 
   // Attach AI platform view event listeners based on activeTab
+  if (state.activeTab === 'gis-command') attachNationalCommandCenterEvents();
+  if (state.activeTab === 'ai-coordinator') attachAICoordinatorEvents();
+  if (state.activeTab === 'live-tracking') attachLiveTrackingEvents();
+  if (state.activeTab === 'documentation') attachDocumentationEvents();
   if (state.activeTab === 'ai-predict') attachAIPredictionEvents();
   if (state.activeTab === 'digital-twin') attachDigitalTwinEvents();
   if (state.activeTab === 'blockchain') attachBlockchainEvents();
@@ -230,6 +239,11 @@ function renderActiveTab() {
   if (tab === 'matching') {
     return renderQuantumMatchView();
   }
+
+  if (tab === 'gis-command') return renderNationalCommandCenterView();
+  if (tab === 'ai-coordinator') return renderAICoordinatorView();
+  if (tab === 'live-tracking') return renderLiveTrackingView();
+  if (tab === 'documentation') return renderDocumentationView();
 
   if (tab === 'ai-predict') return renderAIPredictionView();
   if (tab === 'digital-twin') return renderDigitalTwinView();
@@ -523,6 +537,22 @@ function attachGlobalEvents() {
         await loadSystemData();
       } catch (err) {
         ToastManager.show('Rejection error: ' + err.message, 'error');
+      }
+    };
+  });
+
+  // Admin Remove Doctor Button
+  document.querySelectorAll('.btn-delete-doctor').forEach(btn => {
+    btn.onclick = async () => {
+      const id = parseInt(btn.getAttribute('data-id'));
+      const name = btn.getAttribute('data-name') || 'Doctor';
+      if (!confirm(`Are you sure you want to permanently remove ${name} from the system?`)) return;
+      try {
+        await ApiService.deleteUser(id);
+        ToastManager.show(`Dr. ${name} has been removed successfully by Organizer.`, 'success');
+        await loadSystemData();
+      } catch (err) {
+        ToastManager.show('Removal error: ' + err.message, 'error');
       }
     };
   });

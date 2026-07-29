@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     # Email / SMTP Settings & Admin Destination
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "notifications@qtransplant.org")
+    SMTP_USER: str = os.getenv("SMTP_USER", "aravindhjoshua10@gmail.com")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "zqlgbhkftzzdjcgd")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "aravindhjoshua10@gmail.com")
     SMTP_TLS: bool = True
     ORGANIZER_EMAIL: str = os.getenv("ORGANIZER_EMAIL", "aravindhjoshua10@gmail.com")
 

@@ -1,0 +1,16 @@
+{
+  "short_name": "Q-Transplant",
+  "name": "Q-Transplant National Organ Platform",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#161616",
+  "theme_color": "#0f62fe",
+  "display": "standalone",
+  "orientation": "portrait"
+}

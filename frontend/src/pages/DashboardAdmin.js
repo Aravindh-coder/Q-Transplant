@@ -114,7 +114,7 @@ export function renderDashboardAdmin() {
           <table class="utbl">
             <thead>
               <tr>
-                <th>ID</th><th>Doctor Name</th><th>Email</th><th>Phone</th><th>Status</th>
+                <th>ID</th><th>Doctor Name</th><th>Email</th><th>Phone</th><th>Status</th><th style="text-align:right;">Organizer Action</th>
               </tr>
             </thead>
             <tbody>
@@ -125,8 +125,13 @@ export function renderDashboardAdmin() {
                   <td>${d.email}</td>
                   <td>${d.phone || 'N/A'}</td>
                   <td>${d.is_approved ? '<span class="bx--tag bx--tag--green">APPROVED</span>' : '<span class="bx--tag bx--tag--yellow">PENDING</span>'}</td>
+                  <td style="text-align:right;">
+                    <button class="bx--btn bx--btn--secondary btn-delete-doctor" data-id="${d.id}" data-name="${d.full_name}" style="padding:4px 10px; font-size:11px; background:#da1e28; border-radius:4px; border:none; cursor:pointer;">
+                      <i class="fa-solid fa-trash"></i> Remove Doctor
+                    </button>
+                  </td>
                 </tr>
-              `).join('') || '<tr><td colspan="5" style="text-align:center;">No doctors registered yet</td></tr>'}
+              `).join('') || '<tr><td colspan="6" style="text-align:center;">No doctors registered yet</td></tr>'}
             </tbody>
           </table>
         </div>

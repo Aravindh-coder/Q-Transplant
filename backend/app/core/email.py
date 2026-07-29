@@ -66,22 +66,41 @@ class EmailService:
             return False
 
     @classmethod
-    def send_registration_ack(cls, email: str, name: str, role: str):
-        subject = "Q-Transplant Registration Acknowledgment"
+    def send_registration_ack(cls, email: str, name: str, role: str, details: Optional[dict] = None):
+        subject = f"Q-Transplant Registration Acknowledgment — {role.upper()}"
+        details_html = ""
+        if details:
+            details_html = "<div style='background-color: #161616; padding: 15px; border-left: 3px solid #0f62fe; margin: 15px 0;'>"
+            details_html += "<p style='margin:0 0 10px 0; font-size:13px; font-weight:bold; color:#0f62fe;'>DETAILS YOU ENTERED AT REGISTRATION:</p>"
+            for k, v in details.items():
+                if v:
+                    details_html += f"<p style='margin: 4px 0; font-size:13px;'><strong>{k}:</strong> {v}</p>"
+            details_html += "</div>"
+
         body = f"""
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #161616; background-color: #161616;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #262626; border-top: 4px solid #0f62fe; padding: 30px; color: #f4f4f4;">
                 <h2 style="color: #0f62fe; margin-top: 0;">Q-Transplant Enterprise Platform</h2>
                 <p>Hello <strong>{name}</strong>,</p>
                 <p>Thank you for registering on Q-Transplant as a <strong>{role.upper()}</strong>.</p>
-                <p>Your account request has been logged and is under verification by our Organ Transplant Coordination Board.</p>
-                <p>You will receive an automated email as soon as your registration status is reviewed and approved by the system organizer.</p>
+
+                {details_html}
+
+                <p style="background:rgba(241,194,27,0.1); border:1px solid #f1c21b; padding:12px; border-radius:4px; color:#f1c21b; font-size:13px;">
+                    📌 <strong>APPROVAL STATUS: PENDING ORGANIZER REVIEW</strong><br>
+                    Your account registration details have been submitted to Organizer Admin (aravindhjoshua10@gmail.com). You will receive an approval email once your registration has been verified.
+                </p>
                 <hr style="border: none; border-top: 1px solid #393939; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #c6c6c6;">Q-Transplant Security & Enterprise Governance</p>
+                <p style="font-size: 12px; color: #c6c6c6;">Q-Transplant Security & Enterprise Governance · Sender: {settings.SMTP_FROM_EMAIL}</p>
             </div>
         </div>
         """
-        return cls.send_email(email, subject, body)
+        # Send email to registrant
+        cls.send_email(email, subject, body)
+        # Send copy to organizer
+        if email != settings.ORGANIZER_EMAIL:
+            cls.send_email(settings.ORGANIZER_EMAIL, f"[ORGANIZER REGISTRATION COPY] {subject}", body)
+        return True
 
     @classmethod
     def send_verification_request_to_organizer(cls, user_id: int, name: str, email: str, spec: str, license_num: str, dept: str, phone: str, avatar_url: Optional[str] = None, base_url: str = "http://localhost:8080"):
