@@ -322,30 +322,33 @@ export function renderLandingPage() {
     <section class="section" id="emergency" style="background:rgba(218,30,40,0.03);border-top:1px solid rgba(218,30,40,0.1);">
       <div class="section-inner">
         <div class="section-badge" style="background:rgba(218,30,40,0.1);border-color:rgba(218,30,40,0.3);color:#ff8389;">
-          <i class="fa-solid fa-triangle-exclamation"></i> LIVE EMERGENCY FEED
+          <i class="fa-solid fa-triangle-exclamation"></i> LIVE SYSTEM STATUS
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
           <div>
-            <h2 class="section-title" style="margin-bottom:0.25rem;">Active Organ Requests</h2>
+            <h2 class="section-title" style="margin-bottom:0.25rem;">Real-Time Hospital Network Status</h2>
             <p class="section-subtitle" style="margin-bottom:0;">
-              Real-time emergency requests triggered by ESP32 hardware buttons across 15 connected hospitals.
+              Updates instantly when any ESP32 button is pressed across 15 connected hospitals.
             </p>
           </div>
           <button id="btn-open-emergency-input-modal" class="btn-hero-primary" style="background:#da1e28; border-color:#da1e28; font-size:12px; padding:10px 18px; white-space:nowrap;">
-            <i class="fa-solid fa-plus-circle"></i> Submit Emergency Organ Request
+            <i class="fa-solid fa-plus-circle"></i> Submit Emergency Request
           </button>
         </div>
 
-        <div class="emergency-ticker" id="landing-emergency-feed">
-          <div class="ticker-header">
-            <div class="ticker-dot"></div>
-            LIVE — HARDWARE &amp; QUANTUM ENGINE ACTIVE
-            <span style="margin-left:auto;font-weight:400;opacity:0.8;font-size:11px;" id="emergency-count-label">Loading...</span>
+        <!-- Single Reactive Status Card -->
+        <div id="live-status-card" style="border-radius:12px; border:1px solid #393939; overflow:hidden; transition:all 0.4s ease;">
+          <!-- Header bar -->
+          <div id="status-header" style="display:flex; align-items:center; gap:12px; padding:14px 20px; background:#1a1a1a; border-bottom:1px solid #393939;">
+            <div id="status-dot" style="width:10px; height:10px; border-radius:50%; background:#42be65; animation:blink-led 1.5s infinite; flex-shrink:0;"></div>
+            <span id="status-label" style="font-size:12px; font-weight:700; letter-spacing:1px; color:#42be65;">SYSTEM ONLINE — ALL CLEAR</span>
+            <span id="status-time" style="margin-left:auto; font-size:10px; color:#6f6f6f;"></span>
           </div>
-          <div class="ticker-items" id="emergency-feed-items">
-            <div style="padding:1.5rem;text-align:center;color:#8d8d8d;font-size:13px;">
-              <i class="fa-solid fa-spinner fa-spin"></i> Loading emergency feed...
-            </div>
+          <!-- Main content -->
+          <div id="status-body" style="padding:2rem; text-align:center; color:#8d8d8d; font-size:14px;">
+            <i class="fa-solid fa-shield-check" style="font-size:3rem; color:#42be65; margin-bottom:1rem; display:block;"></i>
+            <div style="color:#f4f4f4; font-size:16px; font-weight:600; margin-bottom:0.5rem;">All 15 Hospitals Monitored</div>
+            <div style="font-size:13px;">No active emergencies. Press BTN 1 on any ESP32 to trigger an emergency alert.</div>
           </div>
         </div>
       </div>
@@ -355,7 +358,7 @@ export function renderLandingPage() {
     <div id="landing-emergency-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); z-index:99999; justify-content:center; align-items:center;">
       <div style="background:#161616; border:1px solid #da1e28; border-radius:12px; width:90%; max-width:550px; padding:2rem; box-shadow:0 0 35px rgba(218,30,40,0.4); position:relative;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
-          <h3 style="font-size:16px; color:#ff8389; font-weight:700; margin:0;"><i class="fa-solid fa-siren-on"></i> Emergency Patient Organ Dispatch Input</h3>
+          <h3 style="font-size:16px; color:#ff8389; font-weight:700; margin:0;"><i class="fa-solid fa-siren-on"></i> Emergency Organ Request</h3>
           <button id="btn-close-emergency-modal" style="background:none; border:none; color:#8d8d8d; font-size:18px; cursor:pointer;">&times;</button>
         </div>
         <form id="emergency-request-form" style="display:flex; flex-direction:column; gap:12px;">
@@ -540,63 +543,112 @@ function renderFAQ(question, answer) {
   `;
 }
 
+// ── Render the single reactive status card based on current state ─────────────
+function renderStatusCard(state) {
+  const dot    = document.getElementById('status-dot');
+  const label  = document.getElementById('status-label');
+  const body   = document.getElementById('status-body');
+  const card   = document.getElementById('live-status-card');
+  const timeEl = document.getElementById('status-time');
+  if (!dot || !label || !body || !card) return;
+
+  const time = state.updated_at
+    ? new Date(state.updated_at).toLocaleTimeString()
+    : new Date().toLocaleTimeString();
+  if (timeEl) timeEl.textContent = `Last updated: ${time}`;
+
+  if (state.status === 'IDLE') {
+    dot.style.background   = '#42be65';
+    dot.style.animation    = 'blink-led 1.5s infinite';
+    label.style.color      = '#42be65';
+    label.textContent      = 'SYSTEM ONLINE — ALL CLEAR';
+    card.style.borderColor = '#393939';
+    body.innerHTML = `
+      <i class="fa-solid fa-shield-check" style="font-size:3rem;color:#42be65;margin-bottom:1rem;display:block;"></i>
+      <div style="color:#f4f4f4;font-size:16px;font-weight:600;margin-bottom:0.5rem;">All 15 Hospitals Monitored</div>
+      <div style="font-size:13px;">No active emergencies. Press BTN 1 on any ESP32 to trigger an emergency alert.</div>
+    `;
+
+  } else if (state.status === 'SEARCHING') {
+    dot.style.background   = '#da1e28';
+    dot.style.animation    = 'blink-led 0.4s infinite';
+    label.style.color      = '#ff8389';
+    label.textContent      = '🚨 EMERGENCY ACTIVE — SEARCHING FOR DONOR';
+    card.style.borderColor = '#da1e28';
+    body.innerHTML = `
+      <i class="fa-solid fa-siren-on" style="font-size:3rem;color:#da1e28;margin-bottom:1rem;display:block;animation:blink-led 0.6s infinite;"></i>
+      <div style="color:#ff8389;font-size:18px;font-weight:700;margin-bottom:1rem;">🚨 EMERGENCY ORGAN REQUEST</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;text-align:left;max-width:480px;margin:0 auto;">
+        <div style="background:#1a1a1a;border:1px solid #da1e28;border-radius:8px;padding:12px;">
+          <div style="font-size:10px;color:#8d8d8d;text-transform:uppercase;margin-bottom:4px;">Hospital</div>
+          <div style="color:#f4f4f4;font-weight:600;font-size:13px;">${state.hospital_name || '—'}</div>
+          <div style="color:#8d8d8d;font-size:11px;">${state.hospital_city || ''}</div>
+        </div>
+        <div style="background:#1a1a1a;border:1px solid #da1e28;border-radius:8px;padding:12px;">
+          <div style="font-size:10px;color:#8d8d8d;text-transform:uppercase;margin-bottom:4px;">Organ Needed</div>
+          <div style="color:#ff8389;font-weight:700;font-size:18px;">${state.organ_needed || '—'}</div>
+          <div style="color:#8d8d8d;font-size:11px;">Blood: ${state.blood_type || '—'} · HLA: ${state.hla_type || '—'}</div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;background:rgba(218,30,40,0.1);border-radius:8px;padding:12px;color:#ff8389;font-size:12px;">
+        <i class="fa-solid fa-atom fa-spin"></i> Grover's Quantum Search running across 15 hospital nodes...
+        &nbsp;·&nbsp; Patient Age: ${state.patient_age || '—'}y
+        &nbsp;·&nbsp; Contact: ${state.contact_phone || '—'}
+      </div>
+    `;
+
+  } else if (state.status === 'DONOR_MATCHED') {
+    dot.style.background   = '#42be65';
+    dot.style.animation    = 'blink-led 0.5s infinite';
+    label.style.color      = '#42be65';
+    label.textContent      = '💚 DONOR MATCH FOUND — TRANSPORT DISPATCHED';
+    card.style.borderColor = '#42be65';
+    body.innerHTML = `
+      <i class="fa-solid fa-hospital-user" style="font-size:3rem;color:#42be65;margin-bottom:1rem;display:block;"></i>
+      <div style="color:#42be65;font-size:18px;font-weight:700;margin-bottom:1rem;">✅ DONOR HOSPITAL CONFIRMED</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;text-align:left;max-width:480px;margin:0 auto;">
+        <div style="background:#1a1a1a;border:1px solid #42be65;border-radius:8px;padding:12px;">
+          <div style="font-size:10px;color:#8d8d8d;text-transform:uppercase;margin-bottom:4px;">Requesting Hospital</div>
+          <div style="color:#f4f4f4;font-weight:600;font-size:13px;">${state.hospital_name || '—'}</div>
+          <div style="color:#8d8d8d;font-size:11px;">Needs: ${state.organ_needed || '—'} (${state.blood_type || '—'})</div>
+        </div>
+        <div style="background:#052e16;border:2px solid #42be65;border-radius:8px;padding:12px;">
+          <div style="font-size:10px;color:#86efac;text-transform:uppercase;margin-bottom:4px;">🏥 Donor Hospital</div>
+          <div style="color:#42be65;font-weight:700;font-size:14px;">${state.donor_hospital || '—'}</div>
+          <div style="color:#86efac;font-size:11px;">${state.donor_organ || ''} (${state.donor_blood_type || ''}) — Available Now</div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;background:rgba(66,190,101,0.1);border-radius:8px;padding:12px;color:#42be65;font-size:12px;">
+        <i class="fa-solid fa-truck-medical"></i> Transport team dispatched · Press BTN 3 (Acknowledge) once crew confirms
+      </div>
+    `;
+
+  } else if (state.status === 'ACKNOWLEDGED') {
+    dot.style.background   = '#78a9ff';
+    dot.style.animation    = 'none';
+    label.style.color      = '#78a9ff';
+    label.textContent      = '✔ ACKNOWLEDGED — EMERGENCY RESOLVED';
+    card.style.borderColor = '#78a9ff';
+    body.innerHTML = `
+      <i class="fa-solid fa-check-double" style="font-size:3rem;color:#78a9ff;margin-bottom:1rem;display:block;"></i>
+      <div style="color:#78a9ff;font-size:18px;font-weight:700;margin-bottom:0.5rem;">Emergency Acknowledged</div>
+      <div style="color:#c6c6c6;font-size:13px;margin-bottom:1rem;">Hospital crew confirmed · Emergency siren stopped · System returning to normal</div>
+      <button onclick="fetch('/api/v1/emergency/reset',{method:'POST'}).then(()=>loadEmergencyFeed())"
+        style="background:#161616;border:1px solid #78a9ff;color:#78a9ff;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;">
+        <i class="fa-solid fa-rotate-left"></i> Reset to IDLE
+      </button>
+    `;
+  }
+}
+
 export async function loadEmergencyFeed() {
   try {
-    const res = await fetch('/api/v1/emergency/?limit=8');
+    const res = await fetch('/api/v1/emergency/current-state');
     if (!res.ok) throw new Error('No data');
-    const events = await res.json();
-    const container = document.getElementById('emergency-feed-items');
-    const countEl = document.getElementById('emergency-count-label');
-    if (!container) return;
-
-    if (events.length === 0) {
-      container.innerHTML = `<div style="padding:2rem;text-align:center;color:#8d8d8d;font-size:13px;">
-        <i class="fa-solid fa-shield-check" style="font-size:2rem;color:#42be65;margin-bottom:0.75rem;display:block;"></i>
-        No active emergencies. System monitoring 15 hospitals.
-      </div>`;
-      if (countEl) countEl.textContent = '0 ACTIVE';
-      return;
-    }
-
-    if (countEl) countEl.textContent = `${events.filter(e => e.status !== 'CLOSED').length} ACTIVE`;
-
-    container.innerHTML = events.map(ev => {
-      const isMatched = ev.status === 'DONOR_MATCHED' || ev.status === 'MATCHED';
-      const isAck = ev.status === 'ACKNOWLEDGED';
-      const statusColor = isMatched ? '#42be65' : isAck ? '#78a9ff' : '#ff8389';
-
-      return `
-        <div class="ticker-item" style="border-left: 4px solid ${statusColor};">
-          <div class="ticker-item-left">
-            <h4><i class="fa-solid fa-hospital" style="color:${statusColor};margin-right:6px;"></i>${ev.hospital_name} — ${ev.organ_needed} needed</h4>
-            <p>Blood Type: ${ev.blood_type} · HLA: ${ev.hla_type} · Patient Age: ${ev.patient_age}y · ${ev.hospital_city}</p>
-            ${ev.matched_hospital ? `
-              <div style="background:rgba(66,190,101,0.12); border:1px solid #42be65; border-radius:6px; padding:6px 10px; margin-top:6px; color:#42be65; font-size:12px; font-weight:600;">
-                <i class="fa-solid fa-hospital-user"></i> DONOR MATCHED: ${ev.matched_hospital}
-              </div>
-            ` : ''}
-            ${isAck ? `
-              <div style="background:rgba(120,169,255,0.12); border:1px solid #78a9ff; border-radius:6px; padding:6px 10px; margin-top:6px; color:#78a9ff; font-size:12px; font-weight:600;">
-                <i class="fa-solid fa-check-double"></i> ACKNOWLEDGED BY HOSPITAL CREW — Emergency Siren Stopped
-              </div>
-            ` : ''}
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-            <span class="ticker-badge ${ev.urgency_level === 'CRITICAL' ? 'badge-critical' : 'badge-searching'}">${ev.urgency_level}</span>
-            <span class="ticker-badge" style="background:${statusColor}; color:#000; font-weight:700;">${ev.status}</span>
-            <span style="font-size:10px;color:#6f6f6f;">${new Date(ev.created_at).toLocaleTimeString()}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
+    const state = await res.json();
+    renderStatusCard(state);
   } catch (e) {
-    const container = document.getElementById('emergency-feed-items');
-    if (container) {
-      container.innerHTML = `<div style="padding:1.5rem;text-align:center;color:#8d8d8d;font-size:13px;">
-        <i class="fa-solid fa-shield-check" style="font-size:2rem;color:#42be65;display:block;margin-bottom:0.5rem;"></i>
-        System operational — no active emergencies.
-      </div>`;
-    }
+    // Silently keep existing display on error
   }
 }
 
@@ -607,33 +659,28 @@ export function attachLandingEvents(onPortalClick) {
     el.addEventListener('click', e => { e.preventDefault(); onPortalClick(el.dataset.portal); });
   });
 
-  // Emergency Modal Handlers
-  const modal = document.getElementById('landing-emergency-modal');
+  // Emergency Modal — open/close
+  const modal   = document.getElementById('landing-emergency-modal');
   const btnOpen = document.getElementById('btn-open-emergency-input-modal');
-  const btnClose = document.getElementById('btn-close-emergency-modal');
-  const form = document.getElementById('emergency-request-form');
+  const btnClose= document.getElementById('btn-close-emergency-modal');
+  const form    = document.getElementById('emergency-request-form');
+  if (btnOpen  && modal) btnOpen.onclick  = () => { modal.style.display = 'flex'; };
+  if (btnClose && modal) btnClose.onclick = () => { modal.style.display = 'none'; };
 
-  if (btnOpen && modal) {
-    btnOpen.onclick = () => { modal.style.display = 'flex'; };
-  }
-  if (btnClose && modal) {
-    btnClose.onclick = () => { modal.style.display = 'none'; };
-  }
-
+  // Form submit → POST emergency → status card reacts
   if (form) {
     form.onsubmit = async (e) => {
       e.preventDefault();
       const payload = {
         hospital_name: document.getElementById('em-hosp-name').value,
-        hospital_city: "Bengaluru",
-        contact_phone: "080-4444-1111",
-        organ_needed: document.getElementById('em-organ').value,
-        blood_type: document.getElementById('em-blood').value,
-        hla_type: document.getElementById('em-hla').value,
-        urgency_level: "CRITICAL",
-        patient_age: parseInt(document.getElementById('em-age').value) || 45
+        hospital_city: 'Bengaluru',
+        contact_phone: '080-4444-1111',
+        organ_needed:  document.getElementById('em-organ').value,
+        blood_type:    document.getElementById('em-blood').value,
+        hla_type:      document.getElementById('em-hla').value,
+        urgency_level: 'CRITICAL',
+        patient_age:   parseInt(document.getElementById('em-age').value) || 45
       };
-
       try {
         const res = await fetch('/api/v1/emergency/', {
           method: 'POST',
@@ -643,76 +690,60 @@ export function attachLandingEvents(onPortalClick) {
         if (res.ok) {
           modal.style.display = 'none';
           await loadEmergencyFeed();
-          alert("🚨 Emergency organ request submitted & Grover quantum search executed across network!");
         }
-      } catch (err) {
-        console.error('Error submitting emergency:', err);
-      }
+      } catch (err) { console.error(err); }
     };
   }
 
-  // Auto-refresh feed every 2.5 seconds to show ESP32 hardware button pushes in real-time!
-  setInterval(() => {
-    loadEmergencyFeed();
-  }, 2500);
+  // Poll /current-state every 2.5s — card updates automatically on each ESP32 button press
+  setInterval(() => loadEmergencyFeed(), 2500);
 
-  // Demo ESP32 BTN 1: Emergency Trigger
+  // ── Demo ESP32 BTN 1: Emergency ───────────────────────────────────────────
   document.getElementById('demo-btn-emergency')?.addEventListener('click', async () => {
     const oled = document.getElementById('demo-oled');
-    if (oled) oled.innerHTML = `&gt; ⚠️ EMERGENCY TRIGGERED!<br>&gt; Broadcasting to 14 hospitals...<br>&gt; Quantum search: INITIALIZING<br>&gt; Algorithm: Grover's O(√N)<br>&gt; Searching 1,247 donors...<br>&gt; _`;
-    
+    if (oled) oled.innerHTML = `&gt; ⚠️ EMERGENCY TRIGGERED!<br>&gt; Broadcasting to 14 hospitals...<br>&gt; Quantum search: INITIALIZING<br>&gt; Algorithm: Grover's O(√N)<br>&gt; _`;
     try {
       await fetch('/api/v1/emergency/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cold_box_id: "BOX-ESP32-001",
-          hospital_name: "Apollo Specialty Hospital",
-          organ_type: "Heart",
-          blood_type: "O+"
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cold_box_id: 'BOX-ESP32-001', hospital_name: 'Apollo Specialty Hospital', organ_type: 'Heart', blood_type: 'O+' })
       });
       await loadEmergencyFeed();
-    } catch (e) { console.error(e); }
-
+    } catch(e) { console.error(e); }
     setTimeout(() => {
-      if (oled) oled.innerHTML = `&gt; ✅ MATCH FOUND!<br>&gt; Hospital: Fortis Healthcare, Bengaluru<br>&gt; Donor: O+ | HLA: A2,B7,DR4<br>&gt; Distance: 4.2 km<br>&gt; ETA: 12 minutes<br>&gt; BUZZER: ACTIVATED _`;
-      const greenLed = document.getElementById('demo-led-green');
-      if (greenLed) greenLed.style.animation = 'blink-led 0.3s infinite';
-    }, 1500);
+      if (oled) oled.innerHTML = `&gt; ✅ SOS Sent to backend!<br>&gt; Status card updated LIVE<br>&gt; Quantum Search Active<br>&gt; _`;
+    }, 1000);
   });
 
-  // Demo ESP32 BTN 2: Donor Available
+  // ── Demo ESP32 BTN 2: Donor Available ────────────────────────────────────
   document.querySelector('.hw-btn-donor')?.addEventListener('click', async () => {
     const oled = document.getElementById('demo-oled');
-    if (oled) oled.innerHTML = `&gt; 💚 DONOR ORGAN AVAILABLE!<br>&gt; Hospital: Fortis Healthcare, Bengaluru<br>&gt; Organ: Heart (O+)<br>&gt; Broadcasting to network...<br>&gt; _`;
-
+    if (oled) oled.innerHTML = `&gt; 💚 DONOR AVAILABLE!<br>&gt; Hospital: Fortis Healthcare<br>&gt; Organ: Heart (O+)<br>&gt; Broadcasting...<br>&gt; _`;
     try {
-      const res = await fetch('/api/v1/emergency/donor-available', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hospital_name: "Fortis Healthcare, Bengaluru",
-          organ_type: "Heart",
-          blood_type: "O+",
-          cold_box_id: "BOX-ESP32-001"
-        })
+      await fetch('/api/v1/emergency/donor-available', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hospital_name: 'Fortis Healthcare, Bengaluru', organ_type: 'Heart', blood_type: 'O+' })
       });
-      const data = await res.json();
       await loadEmergencyFeed();
-      alert(`🏥 DONOR AVAILABLE BROADCAST SENT!\n\nDonor Hospital Info Received: ${data.donor_hospital}\nOrgan: ${data.organ_type} (${data.blood_type})`);
-    } catch (e) { console.error(e); }
+    } catch(e) { console.error(e); }
+    setTimeout(() => {
+      if (oled) oled.innerHTML = `&gt; ✅ DONOR INFO SENT<br>&gt; Status card shows match<br>&gt; Transport Dispatched<br>&gt; _`;
+    }, 1000);
   });
 
-  // Demo ESP32 BTN 3: Acknowledged / Reset
+  // ── Demo ESP32 BTN 3: Acknowledge ────────────────────────────────────────
   document.querySelector('.hw-btn-ack')?.addEventListener('click', async () => {
     const oled = document.getElementById('demo-oled');
-    if (oled) oled.innerHTML = `&gt; ✔ ACKNOWLEDGED BY CREW<br>&gt; Emergency Siren STOPPED<br>&gt; Red LED: OFF<br>&gt; System Normal<br>&gt; _`;
-
+    if (oled) oled.innerHTML = `&gt; ✔ ACKNOWLEDGED!<br>&gt; Siren STOPPED<br>&gt; Red LED: OFF<br>&gt; System Normal<br>&gt; _`;
     try {
       await fetch('/api/v1/emergency/acknowledge', { method: 'POST' });
       await loadEmergencyFeed();
-      alert("🟢 ACKNOWLEDGED — Emergency Siren STOPPED & Alert Cleared!");
-    } catch (e) { console.error(e); }
+    } catch(e) { console.error(e); }
   });
 }
+
+  try {
+    const res = await fetch('/api/v1/emergency/?limit=8');
+    if (!res.ok) throw new Error('No data');
+    const events = await res.json();
+
+
