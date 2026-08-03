@@ -1,7 +1,133 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Q-TRANSPLANT — ULTRA PRO MAX DESIGN SYSTEM EXTENSION
-   Premium animations, glassmorphism, landing page, portal UI
+   CLINICAL WHITE PROFESSIONAL ENTERPRISE THEME (PORTAL DASHBOARDS)
+   Clean, crisp medical UI with white cards, navy text, high legibility
 ═══════════════════════════════════════════════════════════════════ */
+.clinical-dash-wrap {
+  background: #f4f7fb;
+  min-height: calc(100vh - 56px);
+  padding: 1.5rem;
+  color: #1e293b;
+}
+
+.clinical-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.75rem;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #1e293b;
+  position: relative;
+  overflow: hidden;
+}
+.clinical-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  border-color: #cbd5e1;
+}
+
+.clinical-card.blue-accent   { border-top: 4px solid #0f62fe; }
+.clinical-card.purple-accent { border-top: 4px solid #8a3ffc; }
+.clinical-card.green-accent  { border-top: 4px solid #198038; }
+.clinical-card.red-accent    { border-top: 4px solid #da1e28; }
+
+.clinical-kpi-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem;
+}
+.clinical-kpi-card {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 1.5rem; position: relative; overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04); transition: all 0.3s;
+}
+.clinical-kpi-card::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+}
+.clinical-kpi-card.blue::before   { background: #0f62fe; }
+.clinical-kpi-card.purple::before { background: #8a3ffc; }
+.clinical-kpi-card.green::before  { background: #198038; }
+.clinical-kpi-card.red::before    { background: #da1e28; }
+
+.clinical-kpi-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.5rem; }
+.clinical-kpi-val   { font-size: 2.2rem; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: #0f172a; }
+.clinical-kpi-sub   { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+.clinical-table-wrap {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;
+  overflow: hidden; box-shadow: 0 4px 15px rgba(15,23,42,0.04);
+}
+.clinical-table-wrap table.utbl th {
+  background: #f8fafc; color: #475569; font-weight: 700; border-bottom: 1px solid #e2e8f0;
+}
+.clinical-table-wrap table.utbl td {
+  color: #1e293b; border-bottom: 1px solid #f1f5f9;
+}
+.clinical-table-wrap table.utbl tr:hover td {
+  background: #f8fafc; color: #0f172a;
+}
+
+/* ── Override dark main content background inside Clinical Portals ── */
+.clinical-dash-wrap ~ * { background: transparent; }
+main.bx--content:has(.clinical-dash-wrap) {
+  background: #f4f7fb !important;
+}
+/* Fallback: wrap entire bx--content region when clinical is active */
+.clinical-dash-wrap {
+  animation: fadeInUp 0.4s ease-out;
+}
+.clinical-kpi-card {
+  animation: fadeInUp 0.5s ease-out;
+}
+.clinical-card {
+  animation: fadeInUp 0.45s ease-out;
+}
+.clinical-table-wrap {
+  animation: fadeInUp 0.55s ease-out;
+}
+
+/* Clinical form label styles */
+.clinical-dash-wrap label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 4px;
+}
+.clinical-dash-wrap input, .clinical-dash-wrap select, .clinical-dash-wrap textarea {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+}
+.clinical-dash-wrap input:focus, .clinical-dash-wrap select:focus {
+  outline: none;
+  border-color: #0f62fe !important;
+  box-shadow: 0 0 0 2px rgba(15, 98, 254, 0.15);
+}
+
+/* Clinical Status Tag Chips */
+.chip-critical { background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; padding:3px 10px; border-radius:12px; font-size:10px; font-weight:700; }
+.chip-high     { background:#fef3c7; color:#d97706; border:1px solid #fcd34d; padding:3px 10px; border-radius:12px; font-size:10px; font-weight:700; }
+.chip-matched  { background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 10px; border-radius:12px; font-size:10px; font-weight:700; }
+.chip-pending  { background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:3px 10px; border-radius:12px; font-size:10px; font-weight:700; }
+
+/* Admin view section tabs */
+.form-tab {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.form-tab.active, .form-tab:hover {
+  color: #0f62fe;
+  border-bottom-color: #0f62fe;
+}
+.admin-view-section { display: none; }
+.admin-view-section:first-of-type, .admin-view-section.active { display: block; }
 
 /* ── Keyframe Animations ─────────────────────────────────────────── */
 @keyframes fadeInUp {

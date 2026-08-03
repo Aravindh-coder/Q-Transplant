@@ -235,10 +235,104 @@ export function init3DBackground() {
 }
 
 /**
- * Attach 3D Motion Depth Mouse-Tilt effect to card elements across every page
+ * Render interactive 3D WebGL Component Models inside portal dashboard cards
+ * @param {string} canvasId - Element ID of target canvas
+ * @param {string} type - 'heart' | 'bloch' | 'dna' | 'coldbox'
+ */
+export function initEmbedded3DCanvas(canvasId, type) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || typeof THREE === 'undefined') return;
+
+  try {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+    camera.position.z = 200;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    let mainMesh;
+
+    if (type === 'heart') {
+      // 3D Organ / Heart Wireframe Mesh with Core
+      const geo = new THREE.IcosahedronGeometry(55, 2);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xda1e28, wireframe: true });
+      mainMesh = new THREE.Mesh(geo, mat);
+
+      const ringGeo = new THREE.TorusGeometry(80, 1, 16, 64);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x42be65, wireframe: true, transparent: true, opacity: 0.6 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 3;
+      mainMesh.add(ring);
+    } else if (type === 'bloch') {
+      // 3D Grover Qubit Bloch Sphere
+      const geo = new THREE.SphereGeometry(60, 14, 14);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x8a3ffc, wireframe: true });
+      mainMesh = new THREE.Mesh(geo, mat);
+
+      const rGeo = new THREE.TorusGeometry(80, 1.2, 12, 64);
+      const rMat = new THREE.MeshBasicMaterial({ color: 0x0f62fe, transparent: true, opacity: 0.5 });
+      const ring = new THREE.Mesh(rGeo, rMat);
+      ring.rotation.x = Math.PI / 4;
+      mainMesh.add(ring);
+    } else if (type === 'dna') {
+      // 3D DNA Helix Strand
+      mainMesh = new THREE.Group();
+      for (let i = 0; i < 20; i++) {
+        const angle = i * 0.4;
+        const y = (i - 10) * 8;
+        const sphere1 = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x0f62fe }));
+        sphere1.position.set(Math.cos(angle) * 35, y, Math.sin(angle) * 35);
+        const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x8a3ffc }));
+        sphere2.position.set(Math.cos(angle + Math.PI) * 35, y, Math.sin(angle + Math.PI) * 35);
+        mainMesh.add(sphere1);
+        mainMesh.add(sphere2);
+      }
+    } else if (type === 'coldbox') {
+      // 3D ESP32 Cold Box Cube Node
+      const geo = new THREE.BoxGeometry(70, 70, 70);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x0f62fe, wireframe: true });
+      mainMesh = new THREE.Mesh(geo, mat);
+
+      const innerGeo = new THREE.SphereGeometry(25, 8, 8);
+      const innerMat = new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.8 });
+      const inner = new THREE.Mesh(innerGeo, innerMat);
+      mainMesh.add(inner);
+    }
+
+    scene.add(mainMesh);
+
+    let pTime = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      pTime += 0.05;
+
+      if (mainMesh) {
+        mainMesh.rotation.y += 0.015;
+        mainMesh.rotation.x += 0.008;
+        if (type === 'heart') {
+          const s = 1 + Math.sin(pTime) * 0.08;
+          mainMesh.scale.set(s, s, s);
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+  } catch (err) {
+    console.warn(`3D Embedded Canvas ${canvasId} init failed:`, err);
+  }
+}
+
+/**
+ * Attach 3D Motion Depth Mouse-Tilt effect to card elements across every page.
+ * Includes both dark portal cards and new clinical white cards.
  */
 export function attach3DTiltEffects() {
-  const cards = document.querySelectorAll('.problem-card, .portal-card, .kpi-card, .hardware-card, .q-step, .team-card, .match-result-card, .ultra-table-wrap');
+  const cards = document.querySelectorAll(
+    '.problem-card, .portal-card, .kpi-card, .hardware-card, .q-step, .team-card, ' +
+    '.match-result-card, .ultra-table-wrap, .clinical-card, .clinical-kpi-card'
+  );
 
   cards.forEach(card => {
     if (card.dataset.hasTilt) return;
@@ -255,14 +349,14 @@ export function attach3DTiltEffects() {
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
 
-      const rotateX = ((y - centerY) / centerY) * -10;
-      const rotateY = ((x - centerX) / centerX) * 10;
+      const rotateX = ((y - centerY) / centerY) * -8;
+      const rotateY = ((x - centerX) / centerX) * 8;
 
-      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+      card.style.transform = `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.015, 1.015, 1.015)`;
     });
 
     card.addEventListener('mouseleave', () => {
-      card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      card.style.transform = 'perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
     });
   });
 }
