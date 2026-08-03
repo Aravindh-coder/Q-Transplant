@@ -26,8 +26,10 @@ import {
   renderFederatedLearningView, attachFederatedLearningEvents,
   renderMultiAgentView, attachMultiAgentEvents,
   renderResearchAnalyticsView, attachResearchAnalyticsEvents,
-  renderSyntheticDataView, attachSyntheticDataEvents
+  renderSyntheticDataView, attachSyntheticDataEvents,
+  renderSlimeMouldBenchmarkView, attachSlimeMouldBenchmarkEvents
 } from './pages/AdvancedDashboards.js';
+
 
 import { renderNationalCommandCenterView, attachNationalCommandCenterEvents } from './pages/NationalCommandCenter.js';
 import { renderAICoordinatorView, attachAICoordinatorEvents } from './pages/AICoordinator.js';
@@ -133,8 +135,10 @@ function renderApp() {
   if (state.activeTab === 'federated') attachFederatedLearningEvents();
   if (state.activeTab === 'multi-agent') attachMultiAgentEvents();
   if (state.activeTab === 'analytics') attachResearchAnalyticsEvents();
+  if (state.activeTab === 'slime-mould') attachSlimeMouldBenchmarkEvents();
   if (state.activeTab === 'synthetic') attachSyntheticDataEvents();
   if (state.activeTab === 'matching') attachQuantumMatchEvents();
+
 
   attachAIAssistantEvents();
 
@@ -266,7 +270,9 @@ function renderActiveTab() {
   if (tab === 'federated') return renderFederatedLearningView();
   if (tab === 'multi-agent') return renderMultiAgentView();
   if (tab === 'analytics') return renderResearchAnalyticsView();
+  if (tab === 'slime-mould') return renderSlimeMouldBenchmarkView();
   if (tab === 'synthetic') return renderSyntheticDataView();
+
 
   if (tab === 'telemetry') {
     const telemetry = state.telemetry;

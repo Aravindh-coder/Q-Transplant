@@ -73,6 +73,13 @@ export function renderSidebar() {
           </a>
         </li>
         <li>
+          <a href="#" data-tab="slime-mould" class="bx--side-nav__link ${active === 'slime-mould' ? 'active' : ''}">
+            <i class="fa-solid fa-bacteria" style="color:#f1c21b;"></i>
+            <span>Slime Mould vs Q-SMA</span>
+          </a>
+        </li>
+
+        <li>
           <a href="#" data-tab="synthetic" class="bx--side-nav__link ${active === 'synthetic' ? 'active' : ''}">
             <i class="fa-solid fa-database" style="color:#42be65;"></i>
             <span>Synthetic Data Lab</span>
