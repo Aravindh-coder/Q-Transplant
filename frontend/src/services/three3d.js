@@ -235,94 +235,157 @@ export function init3DBackground() {
 }
 
 /**
- * Render interactive 3D WebGL Component Models inside portal dashboard cards
- * @param {string} canvasId - Element ID of target canvas
+ * Render interactive 3D WebGL Component Models inside portal dashboard cards.
+ * Uses a requestAnimationFrame retry if the canvas hasn't been laid out yet.
+ * @param {string} canvasId - Element ID of target <canvas>
  * @param {string} type - 'heart' | 'bloch' | 'dna' | 'coldbox'
  */
 export function initEmbedded3DCanvas(canvasId, type) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas || typeof THREE === 'undefined') return;
+  // Retry up to 20 frames until the canvas has real pixel dimensions
+  let retries = 0;
+  function tryInit() {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || typeof THREE === 'undefined') return;
 
-  try {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-    camera.position.z = 200;
+    // Force the canvas to fill its parent container
+    const parent = canvas.parentElement;
+    const W = parent ? parent.clientWidth : canvas.offsetWidth;
+    // Read height from the inline style attribute, or fall back to offsetHeight
+    const styleH = parseInt(canvas.style.height, 10);
+    const H = styleH > 0 ? styleH : (canvas.offsetHeight || 160);
 
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    let mainMesh;
-
-    if (type === 'heart') {
-      // 3D Organ / Heart Wireframe Mesh with Core
-      const geo = new THREE.IcosahedronGeometry(55, 2);
-      const mat = new THREE.MeshBasicMaterial({ color: 0xda1e28, wireframe: true });
-      mainMesh = new THREE.Mesh(geo, mat);
-
-      const ringGeo = new THREE.TorusGeometry(80, 1, 16, 64);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x42be65, wireframe: true, transparent: true, opacity: 0.6 });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = Math.PI / 3;
-      mainMesh.add(ring);
-    } else if (type === 'bloch') {
-      // 3D Grover Qubit Bloch Sphere
-      const geo = new THREE.SphereGeometry(60, 14, 14);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x8a3ffc, wireframe: true });
-      mainMesh = new THREE.Mesh(geo, mat);
-
-      const rGeo = new THREE.TorusGeometry(80, 1.2, 12, 64);
-      const rMat = new THREE.MeshBasicMaterial({ color: 0x0f62fe, transparent: true, opacity: 0.5 });
-      const ring = new THREE.Mesh(rGeo, rMat);
-      ring.rotation.x = Math.PI / 4;
-      mainMesh.add(ring);
-    } else if (type === 'dna') {
-      // 3D DNA Helix Strand
-      mainMesh = new THREE.Group();
-      for (let i = 0; i < 20; i++) {
-        const angle = i * 0.4;
-        const y = (i - 10) * 8;
-        const sphere1 = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x0f62fe }));
-        sphere1.position.set(Math.cos(angle) * 35, y, Math.sin(angle) * 35);
-        const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x8a3ffc }));
-        sphere2.position.set(Math.cos(angle + Math.PI) * 35, y, Math.sin(angle + Math.PI) * 35);
-        mainMesh.add(sphere1);
-        mainMesh.add(sphere2);
-      }
-    } else if (type === 'coldbox') {
-      // 3D ESP32 Cold Box Cube Node
-      const geo = new THREE.BoxGeometry(70, 70, 70);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x0f62fe, wireframe: true });
-      mainMesh = new THREE.Mesh(geo, mat);
-
-      const innerGeo = new THREE.SphereGeometry(25, 8, 8);
-      const innerMat = new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.8 });
-      const inner = new THREE.Mesh(innerGeo, innerMat);
-      mainMesh.add(inner);
+    if (W === 0 && retries < 20) {
+      retries++;
+      requestAnimationFrame(tryInit);
+      return;
     }
 
-    scene.add(mainMesh);
+    // Set explicit pixel size on the canvas element
+    canvas.width  = W;
+    canvas.height = H;
 
-    let pTime = 0;
-    function animate() {
-      requestAnimationFrame(animate);
-      pTime += 0.05;
+    try {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 1000);
+      camera.position.z = 200;
 
-      if (mainMesh) {
-        mainMesh.rotation.y += 0.015;
-        mainMesh.rotation.x += 0.008;
-        if (type === 'heart') {
-          const s = 1 + Math.sin(pTime) * 0.08;
-          mainMesh.scale.set(s, s, s);
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setSize(W, H, false);           // false = don't override style
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      let mainMesh;
+
+      if (type === 'heart') {
+        const geo = new THREE.IcosahedronGeometry(55, 2);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xda1e28, wireframe: true });
+        mainMesh = new THREE.Mesh(geo, mat);
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(80, 1, 16, 64),
+          new THREE.MeshBasicMaterial({ color: 0x42be65, wireframe: true, transparent: true, opacity: 0.6 })
+        );
+        ring.rotation.x = Math.PI / 3;
+        mainMesh.add(ring);
+
+      } else if (type === 'bloch') {
+        const geo = new THREE.SphereGeometry(60, 14, 14);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x8a3ffc, wireframe: true });
+        mainMesh = new THREE.Mesh(geo, mat);
+        // Equatorial orbit ring
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(80, 1.2, 12, 64),
+          new THREE.MeshBasicMaterial({ color: 0x0f62fe, transparent: true, opacity: 0.7 })
+        );
+        ring.rotation.x = Math.PI / 4;
+        mainMesh.add(ring);
+        // Polar orbit ring
+        const ring2 = new THREE.Mesh(
+          new THREE.TorusGeometry(80, 1.2, 12, 64),
+          new THREE.MeshBasicMaterial({ color: 0xbe95ff, transparent: true, opacity: 0.4 })
+        );
+        ring2.rotation.y = Math.PI / 3;
+        mainMesh.add(ring2);
+        // Qubit state vector arrow
+        const arrowGeo = new THREE.CylinderGeometry(1.5, 1.5, 90, 8);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xf4f4f4 });
+        const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+        arrow.rotation.z = Math.PI / 5;
+        mainMesh.add(arrow);
+
+      } else if (type === 'dna') {
+        mainMesh = new THREE.Group();
+        for (let i = 0; i < 24; i++) {
+          const angle = i * 0.38;
+          const y = (i - 12) * 7;
+          const s1 = new THREE.Mesh(
+            new THREE.SphereGeometry(3.5, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0x0f62fe })
+          );
+          s1.position.set(Math.cos(angle) * 38, y, Math.sin(angle) * 38);
+          const s2 = new THREE.Mesh(
+            new THREE.SphereGeometry(3.5, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0x8a3ffc })
+          );
+          s2.position.set(Math.cos(angle + Math.PI) * 38, y, Math.sin(angle + Math.PI) * 38);
+          // Connecting rung
+          if (i % 3 === 0) {
+            const rungGeo = new THREE.CylinderGeometry(0.8, 0.8, 76, 4);
+            const rungMat = new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.5 });
+            const rung = new THREE.Mesh(rungGeo, rungMat);
+            rung.position.set(0, y, 0);
+            rung.rotation.z = Math.PI / 2;
+            rung.rotation.y = angle;
+            mainMesh.add(rung);
+          }
+          mainMesh.add(s1);
+          mainMesh.add(s2);
         }
+
+      } else if (type === 'coldbox') {
+        mainMesh = new THREE.Group();
+        const box = new THREE.Mesh(
+          new THREE.BoxGeometry(70, 70, 70),
+          new THREE.MeshBasicMaterial({ color: 0x0f62fe, wireframe: true })
+        );
+        const inner = new THREE.Mesh(
+          new THREE.SphereGeometry(22, 10, 10),
+          new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.85 })
+        );
+        // Antenna spike
+        const ant = new THREE.Mesh(
+          new THREE.CylinderGeometry(1, 1, 50, 6),
+          new THREE.MeshBasicMaterial({ color: 0xf1c21b })
+        );
+        ant.position.y = 60;
+        mainMesh.add(box);
+        mainMesh.add(inner);
+        mainMesh.add(ant);
       }
-      renderer.render(scene, camera);
+
+      if (mainMesh) scene.add(mainMesh);
+
+      let pTime = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        pTime += 0.05;
+        if (mainMesh) {
+          mainMesh.rotation.y += 0.015;
+          mainMesh.rotation.x += 0.006;
+          if (type === 'heart') {
+            const s = 1 + Math.sin(pTime) * 0.09;
+            mainMesh.scale.set(s, s, s);
+          }
+        }
+        renderer.render(scene, camera);
+      }
+      animate();
+    } catch (err) {
+      console.warn(`3D Embedded Canvas [${canvasId}] failed:`, err);
     }
-    animate();
-  } catch (err) {
-    console.warn(`3D Embedded Canvas ${canvasId} init failed:`, err);
   }
+
+  tryInit();
 }
+
 
 /**
  * Attach 3D Motion Depth Mouse-Tilt effect to card elements across every page.
