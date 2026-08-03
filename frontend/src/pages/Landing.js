@@ -1,10 +1,9 @@
-/**
- * Q-Transplant Landing Page
- * Ultra-premium public-facing page with project details, quantum algo explainer,
- * ESP32 hardware section, live emergency feed, FAQ, About Us.
- */
+import { playEmergencyAlertSound, playDonorMatchSound, playAckSound } from '../services/sound.js';
+
+let lastSeenStatus = null;
 
 export function renderLandingPage() {
+
   return `
     <!-- ══════════ NAVIGATION ══════════ -->
     <nav class="landing-nav">
@@ -552,9 +551,18 @@ function renderStatusCard(state) {
   const timeEl = document.getElementById('status-time');
   if (!dot || !label || !body || !card) return;
 
+  // Play audio alert if status changed
+  if (lastSeenStatus !== state.status) {
+    if (state.status === 'SEARCHING') playEmergencyAlertSound();
+    if (state.status === 'DONOR_MATCHED') playDonorMatchSound();
+    if (state.status === 'ACKNOWLEDGED') playAckSound();
+    lastSeenStatus = state.status;
+  }
+
   const time = state.updated_at
     ? new Date(state.updated_at).toLocaleTimeString()
     : new Date().toLocaleTimeString();
+
   if (timeEl) timeEl.textContent = `Last updated: ${time}`;
 
   if (state.status === 'IDLE') {
