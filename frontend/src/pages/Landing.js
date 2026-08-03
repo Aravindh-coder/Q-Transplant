@@ -5,16 +5,21 @@ let lastSeenStatus = null;
 export function renderLandingPage() {
 
   return `
-    <!-- ══════════ JUDGE / EVALUATOR HACKATHON SHOWCASE BANNER ══════════ -->
-    <div style="background: linear-gradient(90deg, #0f62fe, #8a3ffc, #da1e28); padding: 8px 16px; text-align: center; font-size: 12px; font-weight: 700; color: white; position: fixed; top: 0; left: 0; right: 0; z-index: 1001; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-      <span>🏆 JUDGE &amp; EVALUATOR SHOWCASE MODE:</span>
-      <button id="btn-run-pitch-demo" style="background: #ffffff; color: #0f62fe; border: none; border-radius: 4px; padding: 4px 12px; font-weight: 800; font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s;">
-        <i class="fa-solid fa-play"></i> LAUNCH 30-SEC WINNING DEMO SHOWCASE
-      </button>
+    <!-- ══════════ CLINICAL ENTERPRISE SYSTEM STATUS BAR ══════════ -->
+    <div style="background: #161616; border-bottom: 1px solid rgba(57,57,57,0.8); padding: 7px 16px; text-align: center; font-size: 11px; font-weight: 600; color: #c6c6c6; position: fixed; top: 0; left: 0; right: 0; z-index: 1001; display: flex; align-items: center; justify-content: center; gap: 16px;">
+      <span style="display:inline-flex; align-items:center; gap:6px; color:#42be65;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#42be65; animation:blink-led 1.5s infinite;"></span>
+        CLINICAL PLATFORM ACTIVE
+      </span>
+      <span style="color:#525252;">|</span>
+      <span><i class="fa-solid fa-shield-halved" style="color:#0f62fe;"></i> NOTTO &amp; HIPAA COMPLIANT ORGAN ALLOCATION</span>
+      <span style="color:#525252;">|</span>
+      <span><i class="fa-solid fa-hospital" style="color:#8a3ffc;"></i> 15 REGIONAL MEDICAL CENTERS CONNECTED</span>
     </div>
 
     <!-- ══════════ NAVIGATION ══════════ -->
-    <nav class="landing-nav" style="top: 35px;">
+    <nav class="landing-nav" style="top: 31px;">
+
       <a class="landing-nav-brand" href="#" id="landing-logo-link">
         <div class="brand-icon"><i class="fa-solid fa-heart-pulse"></i></div>
         Q-Transplant
@@ -791,27 +796,8 @@ export function attachLandingEvents(onPortalClick) {
     }, 1000);
   });
 
-  // ── 🏆 HACKATHON WINNING PITCH DEMO SHOWCASE ────────────────────────────────
-  document.getElementById('btn-run-pitch-demo')?.addEventListener('click', async () => {
-    alert("🎬 LAUNCHING 30-SECOND WINNING DEMO SHOWCASE!\n\nSit back while Q-Transplant automatically demonstrates the full Emergency SOS -> Quantum Match -> Donor Match -> Crew Acknowledge workflow.");
 
-    // Step 1: Trigger Emergency
-    const btn1 = document.getElementById('demo-btn-emergency');
-    if (btn1) btn1.click();
-    document.getElementById('emergency')?.scrollIntoView({ behavior: 'smooth' });
 
-    // Step 2: Donor Available Match after 4 seconds
-    setTimeout(() => {
-      const btn2 = document.querySelector('.hw-btn-donor');
-      if (btn2) btn2.click();
-    }, 4000);
-
-    // Step 3: Crew Acknowledge after 8 seconds
-    setTimeout(() => {
-      const btn3 = document.querySelector('.hw-btn-ack');
-      if (btn3) btn3.click();
-    }, 8000);
-  });
 
   // ── ⚡ QUANTUM VS CLASSICAL BENCHMARK SLIDER ─────────────────────────────────
   const slider = document.getElementById('bm-slider');
