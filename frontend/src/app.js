@@ -145,21 +145,6 @@ function renderApp() {
   // Initialize 3D Motion Particle Canvas & 3D Depth Card Tilt effects across every page
   init3DBackground();
   setTimeout(() => attach3DTiltEffects(), 100);
-
-  // Apply clinical white background for portal dashboards
-  setTimeout(() => {
-    const mainEl = document.querySelector('main.bx--content');
-    const hasClinical = document.querySelector('.clinical-dash-wrap');
-    if (mainEl) {
-      if (hasClinical) {
-        mainEl.style.background = '#f4f7fb';
-        mainEl.style.color = '#1e293b';
-      } else {
-        mainEl.style.background = '';
-        mainEl.style.color = '';
-      }
-    }
-  }, 50);
 }
 
 

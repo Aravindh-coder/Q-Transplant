@@ -3,107 +3,102 @@ import { initEmbedded3DCanvas } from '../services/three3d.js';
 
 export function renderDashboardAdmin() {
   const pending = state.pendingUsers || [];
-  const logs = state.auditLogs || [];
-  const allUsersDetailed = state.allUsersDetailed || { doctors: [], hospitals: [], donors: [], patients: [], pending: [] };
+  const allUsersDetailed = state.allUsersDetailed || { doctors: [], hospitals: [], donors: [], patients: [] };
 
-  // Trigger embedded 3D Bloch sphere component after render
-  setTimeout(() => initEmbedded3DCanvas('org-3d-canvas', 'bloch'), 100);
+  setTimeout(() => initEmbedded3DCanvas('org-3d-bloch', 'bloch'), 120);
 
   return `
-    <div class="clinical-dash-wrap">
-      <!-- Header Bar -->
-      <div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div style="animation: fadeInUp 0.4s ease;">
+
+      <!-- Header -->
+      <div class="dash-header" style="margin-bottom:2rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
         <div>
-          <div style="display:inline-flex; align-items:center; gap:6px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:20px; padding:4px 12px; font-size:11px; font-weight:700; color:#475569; letter-spacing:1px; margin-bottom:8px;">
-            <i class="fa-solid fa-shield-halved" style="color:#0f62fe;"></i> ORGANIZER EXECUTIVE COMMAND
+          <div class="section-badge">
+            <i class="fa-solid fa-shield-halved"></i> ORGANIZER EXECUTIVE COMMAND
           </div>
-          <h1 style="font-size:1.8rem; font-weight:700; color:#0f172a; margin:0;">National Organ Allocation Command Center</h1>
-          <p style="font-size:13px; color:#64748b; margin-top:4px;">Lead Organizer Administrator: <strong style="color:#0f172a;">aravindhjoshua10@gmail.com</strong> &nbsp;·&nbsp; NOTTO Audit &amp; System Governance</p>
+          <h1 class="dash-title" style="margin-top:6px;">National Organ Allocation Command Center</h1>
+          <p class="dash-subtitle">Lead Organizer: <strong style="color:#f4f4f4;">aravindhjoshua10@gmail.com</strong> &nbsp;·&nbsp; NOTTO Audit &amp; System Governance</p>
         </div>
-        <div>
-          <button id="btn-refresh-admin-data" style="background:#ffffff; color:#0f172a; border:1px solid #cbd5e1; padding:9px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-            <i class="fa-solid fa-rotate"></i> Refresh Operational Feed
-          </button>
+        <button id="btn-refresh-admin-data" class="btn-call" style="padding:10px 16px; font-size:13px;">
+          <i class="fa-solid fa-rotate"></i> Refresh Operational Feed
+        </button>
+      </div>
+
+      <!-- KPI Row -->
+      <div class="kpi-grid" style="margin-bottom:2rem;">
+        <div class="kpi-card green">
+          <div class="kpi-card-label"><i class="fa-solid fa-hand-holding-heart" style="color:#42be65;"></i> Registered Donors</div>
+          <div class="kpi-card-value" style="color:#42be65;">1,247</div>
+          <div class="kpi-card-sub">Verified Donor Pledges</div>
+        </div>
+        <div class="kpi-card purple">
+          <div class="kpi-card-label"><i class="fa-solid fa-bed-pulse" style="color:#be95ff;"></i> Waitlist Patients</div>
+          <div class="kpi-card-value" style="color:#be95ff;">893</div>
+          <div class="kpi-card-sub">Active Recipient Queue</div>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-card-label"><i class="fa-solid fa-hospital" style="color:#ff8389;"></i> Connected Hospitals</div>
+          <div class="kpi-card-value" style="color:#ff8389;">15</div>
+          <div class="kpi-card-sub">ESP32 IoT Nodes Active</div>
+        </div>
+        <div class="kpi-card blue">
+          <div class="kpi-card-label"><i class="fa-solid fa-atom" style="color:#78a9ff;"></i> Quantum Search SLA</div>
+          <div class="kpi-card-value" style="color:#78a9ff;">0.3ms</div>
+          <div class="kpi-card-sub">Grover's O(√N) Acceleration</div>
         </div>
       </div>
 
-      <!-- KPI Executive Summary Row -->
-      <div class="clinical-kpi-grid" style="margin-bottom: 1.5rem;">
-        <div class="clinical-kpi-card green">
-          <div class="clinical-kpi-label"><i class="fa-solid fa-hand-holding-heart" style="color:#198038;"></i> Registered Donors</div>
-          <div class="clinical-kpi-val" style="color:#198038;">${allUsersDetailed.donors && allUsersDetailed.donors.length > 0 ? (1247 + allUsersDetailed.donors.length) : '1,247'}</div>
-          <div class="clinical-kpi-sub">Verified Donor Pledges</div>
-        </div>
-        <div class="clinical-kpi-card purple">
-          <div class="clinical-kpi-label"><i class="fa-solid fa-bed-pulse" style="color:#8a3ffc;"></i> Waitlist Patients</div>
-          <div class="clinical-kpi-val" style="color:#8a3ffc;">${allUsersDetailed.patients && allUsersDetailed.patients.length > 0 ? (893 + allUsersDetailed.patients.length) : '893'}</div>
-          <div class="clinical-kpi-sub">Active Recipient Queue</div>
-        </div>
-        <div class="clinical-kpi-card red">
-          <div class="clinical-kpi-label"><i class="fa-solid fa-hospital" style="color:#da1e28;"></i> Connected Hospitals</div>
-          <div class="clinical-kpi-val" style="color:#da1e28;">${allUsersDetailed.hospitals ? Math.max(15, allUsersDetailed.hospitals.length) : 15}</div>
-          <div class="clinical-kpi-sub">ESP32 IoT Nodes Active</div>
-        </div>
-        <div class="clinical-kpi-card blue">
-          <div class="clinical-kpi-label"><i class="fa-solid fa-atom" style="color:#0f62fe;"></i> Quantum Search SLA</div>
-          <div class="clinical-kpi-val" style="color:#0f62fe;">0.3ms</div>
-          <div class="clinical-kpi-sub">Grover's O(√N) Acceleration</div>
-        </div>
-      </div>
-
-      <!-- Embedded 3D Grover Bloch Sphere Component Banner -->
-      <div class="clinical-card blue-accent" style="margin-bottom: 1.5rem; display:grid; grid-template-columns: 8fr 4fr; gap:1.5rem; align-items:center;">
+      <!-- Two-column: Bloch Sphere Banner + Quantum Description -->
+      <div class="problem-card blue" style="margin-bottom:2rem; display:grid; grid-template-columns: 7fr 5fr; gap:1.5rem; align-items:center;">
         <div>
-          <div style="font-size:11px; font-weight:700; color:#0f62fe; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
-            <i class="fa-solid fa-atom"></i> Grover's Quantum Match Engine Real-Time Model
-          </div>
-          <h3 style="font-size:1.2rem; font-weight:700; color:#0f172a; margin:0 0 8px 0;">Organ Allocation Quantum Superposition State</h3>
-          <p style="font-size:13px; color:#64748b; line-height:1.6; margin:0;">
-            Grover's quantum algorithm processes 1,000,000+ donor-recipient permutations simultaneously in $\\mathcal{O}(\\sqrt{N})$ iterations. The 3D Bloch sphere model on the right tracks qubit state vector transformations during live dispatches.
+          <div class="section-badge" style="margin-bottom:8px;"><i class="fa-solid fa-atom"></i> Grover's Quantum Match Engine — Live State Model</div>
+          <h3 style="font-size:1.1rem; font-weight:700; color:#f4f4f4; margin:0 0 8px 0;">Organ Allocation Quantum Superposition State</h3>
+          <p style="font-size:13px; color:#c6c6c6; line-height:1.7; margin:0;">
+            Grover's algorithm processes 1,000,000+ donor-recipient permutations simultaneously in 
+            <span style="color:#be95ff; font-family:'IBM Plex Mono'; font-weight:700;">O(√N)</span> iterations.
+            The live 3D Bloch sphere tracks the qubit state vector during active dispatches across all 15 ESP32 hospital nodes.
           </p>
         </div>
-        <div style="background:#0f172a; border-radius:10px; padding:10px; text-align:center;">
-          <canvas id="org-3d-canvas" style="width:100%; height:130px; display:block;"></canvas>
-          <div style="font-size:10px; color:#94a3b8; margin-top:4px;">3D Grover Qubit Bloch Vector</div>
+        <div style="background:#161616; border-radius:10px; padding:12px; text-align:center;">
+          <canvas id="org-3d-bloch" style="width:100%; height:140px; display:block;"></canvas>
+          <div style="font-size:10px; color:#6f6f6f; margin-top:6px; font-family:'IBM Plex Mono';">3D Grover Qubit Bloch Sphere — Live Vector</div>
         </div>
       </div>
 
-      <!-- Pending Doctor & User Approvals Table -->
-      <div class="clinical-table-wrap" style="margin-bottom: 2rem;">
-        <div style="padding:1.25rem 1.5rem; background:#fffbf0; border-bottom:1px solid #fef08a; display:flex; justify-content:space-between; align-items:center;">
-          <div style="font-size:14px; font-weight:700; color:#854d0e;">
-            <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i> Pending Applicant Credentials Review (${pending.length})
+      <!-- Pending Approvals Table -->
+      <div class="ultra-table-wrap" style="margin-bottom:2rem;">
+        <div class="ultra-table-header">
+          <div class="ultra-table-title">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#f1c21b; margin-right:8px;"></i>
+            Pending Applicant Credentials Review (${pending.length})
           </div>
         </div>
+
         ${pending.length === 0 ? `
-          <div style="padding: 2rem; text-align: center; color: #64748b;">
-            <i class="fa-solid fa-shield-check" style="font-size: 2.2rem; color: #16a34a; margin-bottom: 8px; display: block;"></i>
-            <div style="color:#0f172a; font-size:14px; font-weight:600;">All Medical Registrations Reviewed</div>
-            <div style="font-size:12px;">No pending doctor or hospital approval requests in queue.</div>
+          <div style="padding:2.5rem; text-align:center; color:#6f6f6f;">
+            <i class="fa-solid fa-shield-check" style="font-size:2.5rem; color:#42be65; display:block; margin-bottom:8px;"></i>
+            <div style="color:#c6c6c6; font-size:14px; font-weight:600;">All Medical Registrations Reviewed</div>
+            <div style="font-size:12px; margin-top:4px;">No pending approval requests.</div>
           </div>
         ` : `
           <table class="utbl">
             <thead>
               <tr>
-                <th>Applicant Name</th>
-                <th>Requested Role</th>
-                <th>Email Address</th>
-                <th>Registration Date</th>
-                <th style="text-align:right;">Organizer Executive Action</th>
+                <th>Applicant Name</th><th>Role</th><th>Email</th><th>Date</th><th style="text-align:right;">Action</th>
               </tr>
             </thead>
             <tbody>
               ${pending.map(u => `
                 <tr>
                   <td><strong>${u.full_name}</strong></td>
-                  <td><span style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700;">${u.role.toUpperCase()}</span></td>
+                  <td><span class="ticker-badge" style="background:#393939;">${u.role.toUpperCase()}</span></td>
                   <td>${u.email}</td>
-                  <td style="font-family:'IBM Plex Mono'; font-size:12px; color:#64748b;">${u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Recent'}</td>
+                  <td style="font-family:'IBM Plex Mono'; font-size:12px; color:#8d8d8d;">${u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Recent'}</td>
                   <td style="text-align:right;">
-                    <button class="btn-approve-user" data-id="${u.id}" style="background:#16a34a; color:#fff; border:none; padding:5px 12px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">
-                      <i class="fa-solid fa-check"></i> Approve Account
+                    <button class="btn-approve-user" data-id="${u.id}" style="background:#198038; color:#fff; border:none; padding:5px 12px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">
+                      <i class="fa-solid fa-check"></i> Approve
                     </button>
-                    <button class="btn-reject-user" data-id="${u.id}" style="background:#dc2626; color:#fff; border:none; padding:5px 12px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; margin-left:6px;">
+                    <button class="btn-reject-user" data-id="${u.id}" style="background:#da1e28; color:#fff; border:none; padding:5px 12px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; margin-left:6px;">
                       <i class="fa-solid fa-xmark"></i> Reject
                     </button>
                   </td>
@@ -114,42 +109,83 @@ export function renderDashboardAdmin() {
         `}
       </div>
 
-      <!-- Master Ecosystem Registry Table -->
-      <div class="clinical-table-wrap" style="margin-bottom: 2rem;">
-        <div style="padding:1.25rem 1.5rem; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
-          <div style="font-size:14px; font-weight:700; color:#0f172a;">
-            <i class="fa-solid fa-users" style="color:#0f62fe;margin-right:8px;"></i> Master Registry of Medical Centers &amp; System Profiles
-          </div>
+      <!-- Master Registry -->
+      <div class="ultra-table-wrap">
+        <div class="ultra-table-header">
+          <div class="ultra-table-title"><i class="fa-solid fa-users" style="color:#0f62fe;margin-right:8px;"></i> Master Registry of Medical Centers &amp; System Profiles</div>
         </div>
-
-        <div style="display:flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
-          <button class="form-tab active tab-admin-view" data-target="admin-view-doctors">Transplant Doctors (${allUsersDetailed.doctors ? allUsersDetailed.doctors.length : 0})</button>
-          <button class="form-tab tab-admin-view" data-target="admin-view-hospitals">Hospitals (${allUsersDetailed.hospitals ? allUsersDetailed.hospitals.length : 0})</button>
-          <button class="form-tab tab-admin-view" data-target="admin-view-donors">Donors (${allUsersDetailed.donors ? allUsersDetailed.donors.length : 0})</button>
-          <button class="form-tab tab-admin-view" data-target="admin-view-patients">Patients (${allUsersDetailed.patients ? allUsersDetailed.patients.length : 0})</button>
+        <div style="display:flex; border-bottom:1px solid #393939;">
+          <button class="form-tab active tab-admin-view" data-target="admin-view-doctors" style="padding:10px 18px; font-size:13px; font-weight:600; color:#8d8d8d; background:transparent; border:none; cursor:pointer; border-bottom:2px solid transparent;">Doctors (${allUsersDetailed.doctors ? allUsersDetailed.doctors.length : 0})</button>
+          <button class="form-tab tab-admin-view" data-target="admin-view-hospitals" style="padding:10px 18px; font-size:13px; font-weight:600; color:#8d8d8d; background:transparent; border:none; cursor:pointer; border-bottom:2px solid transparent;">Hospitals (${allUsersDetailed.hospitals ? allUsersDetailed.hospitals.length : 0})</button>
+          <button class="form-tab tab-admin-view" data-target="admin-view-donors" style="padding:10px 18px; font-size:13px; font-weight:600; color:#8d8d8d; background:transparent; border:none; cursor:pointer; border-bottom:2px solid transparent;">Donors (${allUsersDetailed.donors ? allUsersDetailed.donors.length : 0})</button>
+          <button class="form-tab tab-admin-view" data-target="admin-view-patients" style="padding:10px 18px; font-size:13px; font-weight:600; color:#8d8d8d; background:transparent; border:none; cursor:pointer; border-bottom:2px solid transparent;">Patients (${allUsersDetailed.patients ? allUsersDetailed.patients.length : 0})</button>
         </div>
-
-        <!-- Doctors View -->
-        <div id="admin-view-doctors" class="admin-view-section">
+        <div id="admin-view-doctors" class="admin-view-section" style="display:block;">
           <table class="utbl">
-            <thead>
-              <tr><th>ID</th><th>Doctor Name</th><th>Email</th><th>Phone</th><th>Status</th><th style="text-align:right;">Organizer Action</th></tr>
-            </thead>
+            <thead><tr><th>ID</th><th>Doctor Name</th><th>Email</th><th>Phone</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
             <tbody>
               ${(allUsersDetailed.doctors || []).map(d => `
                 <tr>
-                  <td style="font-family:'IBM Plex Mono';">#DOC-${d.id}</td>
+                  <td style="font-family:'IBM Plex Mono'; font-size:12px;">#DOC-${d.id}</td>
                   <td><strong>${d.full_name}</strong></td>
                   <td>${d.email}</td>
                   <td>${d.phone || 'N/A'}</td>
-                  <td>${d.is_approved ? '<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700;">APPROVED</span>' : '<span style="background:#fef3c7; color:#b45309; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700;">PENDING</span>'}</td>
+                  <td>${d.is_approved ? '<span class="ticker-badge badge-matched">APPROVED</span>' : '<span class="ticker-badge badge-critical">PENDING</span>'}</td>
                   <td style="text-align:right;">
-                    <button class="btn-delete-doctor" data-id="${d.id}" data-name="${d.full_name}" style="background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">
-                      <i class="fa-solid fa-trash"></i> Remove Doctor
+                    <button class="btn-delete-doctor" data-id="${d.id}" data-name="${d.full_name}" style="background:#da1e28; color:#fff; border:none; padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">
+                      <i class="fa-solid fa-trash"></i> Remove
                     </button>
                   </td>
                 </tr>
-              `).join('') || '<tr><td colspan="6" style="text-align:center;">No doctors registered yet</td></tr>'}
+              `).join('') || '<tr><td colspan="6" style="text-align:center; color:#6f6f6f; padding:2rem;">No doctors registered yet</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div id="admin-view-hospitals" class="admin-view-section" style="display:none;">
+          <table class="utbl">
+            <thead><tr><th>ID</th><th>Hospital Name</th><th>Email</th><th>City</th><th>Status</th></tr></thead>
+            <tbody>
+              ${(allUsersDetailed.hospitals || []).map(h => `
+                <tr>
+                  <td style="font-family:'IBM Plex Mono'; font-size:12px;">#HSP-${h.id}</td>
+                  <td><strong>${h.full_name}</strong></td>
+                  <td>${h.email}</td>
+                  <td>${h.city || 'N/A'}</td>
+                  <td>${h.is_approved ? '<span class="ticker-badge badge-matched">APPROVED</span>' : '<span class="ticker-badge badge-critical">PENDING</span>'}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="5" style="text-align:center; color:#6f6f6f; padding:2rem;">No hospitals registered yet</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div id="admin-view-donors" class="admin-view-section" style="display:none;">
+          <table class="utbl">
+            <thead><tr><th>ID</th><th>Donor Name</th><th>Email</th><th>Blood Type</th><th>Status</th></tr></thead>
+            <tbody>
+              ${(allUsersDetailed.donors || []).map(d => `
+                <tr>
+                  <td style="font-family:'IBM Plex Mono'; font-size:12px;">#DNR-${d.id}</td>
+                  <td><strong>${d.full_name}</strong></td>
+                  <td>${d.email}</td>
+                  <td><span class="ticker-badge badge-critical">${d.blood_type || 'N/A'}</span></td>
+                  <td>${d.is_approved ? '<span class="ticker-badge badge-matched">APPROVED</span>' : '<span class="ticker-badge badge-critical">PENDING</span>'}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="5" style="text-align:center; color:#6f6f6f; padding:2rem;">No donors registered yet</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div id="admin-view-patients" class="admin-view-section" style="display:none;">
+          <table class="utbl">
+            <thead><tr><th>ID</th><th>Patient Name</th><th>Email</th><th>Organ Needed</th><th>Status</th></tr></thead>
+            <tbody>
+              ${(allUsersDetailed.patients || []).map(p => `
+                <tr>
+                  <td style="font-family:'IBM Plex Mono'; font-size:12px;">#PT-${p.id}</td>
+                  <td><strong>${p.full_name}</strong></td>
+                  <td>${p.email}</td>
+                  <td>${p.organ_needed || 'N/A'}</td>
+                  <td><span class="ticker-badge badge-matched">WAITLISTED</span></td>
+                </tr>
+              `).join('') || '<tr><td colspan="5" style="text-align:center; color:#6f6f6f; padding:2rem;">No patients registered yet</td></tr>'}
             </tbody>
           </table>
         </div>
