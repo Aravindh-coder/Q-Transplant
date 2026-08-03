@@ -14,6 +14,9 @@ import { renderDashboardHospital } from './pages/DashboardHospital.js';
 import { renderDashboardDonor } from './pages/DashboardDonor.js';
 import { renderDashboardPatient } from './pages/DashboardPatient.js';
 
+import { init3DBackground, attach3DTiltEffects } from './services/three3d.js';
+
+
 import { renderQuantumMatchView, attachQuantumMatchEvents } from './pages/QuantumMatchView.js';
 import { renderTelemetryGauge } from './components/TelemetryGauge.js';
 import { renderAIPredictionView, attachAIPredictionEvents } from './pages/AIPredictionView.js';
@@ -81,12 +84,16 @@ function renderApp() {
       renderApp();
     });
     loadEmergencyFeed();
+    init3DBackground();
+    setTimeout(() => attach3DTiltEffects(), 100);
     return;
   }
 
   if (state.view === 'portal-selector') {
     root.innerHTML = renderPortalSelector();
     attachPortalSelectorEvents();
+    init3DBackground();
+    setTimeout(() => attach3DTiltEffects(), 100);
     return;
   }
 
@@ -94,8 +101,11 @@ function renderApp() {
     root.innerHTML = renderAuthForm(state.activePortal || 'organizer');
     attachPortalAuthEvents();
     checkHashForResetToken();
+    init3DBackground();
+    setTimeout(() => attach3DTiltEffects(), 100);
     return;
   }
+
 
   // Logged-in Dashboard view
   root.innerHTML = `
@@ -127,7 +137,12 @@ function renderApp() {
   if (state.activeTab === 'matching') attachQuantumMatchEvents();
 
   attachAIAssistantEvents();
+
+  // Initialize 3D Motion Particle Canvas & 3D Depth Card Tilt effects across every page
+  init3DBackground();
+  setTimeout(() => attach3DTiltEffects(), 100);
 }
+
 
 function renderActiveTab() {
   const role = state.currentUser ? state.currentUser.role : 'organizer';
