@@ -10,6 +10,8 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 
+import * as THREE from 'three';
+
 let bgScene, bgCamera, bgRenderer;
 let dnaGroup, heartMesh, heartCoreMesh, quantumBlochGroup, hospitalNodesGroup;
 let mouseX = 0, mouseY = 0;
@@ -234,133 +236,266 @@ export function init3DBackground() {
   }
 }
 
+// Track active animation frame IDs to prevent duplicate render loops
+const activeAnimationFrames = {};
+
 /**
  * Render interactive 3D WebGL Component Models inside portal dashboard cards.
- * Canvas must have explicit width="" height="" HTML attributes set.
+ * Includes automatic 2D Canvas mathematical 3D vector fallback if WebGL fails.
  * @param {string} canvasId - Element ID of target <canvas>
  * @param {string} type - 'heart' | 'bloch' | 'dna' | 'coldbox'
  */
 export function initEmbedded3DCanvas(canvasId, type) {
   const canvas = document.getElementById(canvasId);
-  if (!canvas) { console.warn('[3D] Canvas not found:', canvasId); return; }
-  if (typeof THREE === 'undefined') { console.warn('[3D] THREE not loaded'); return; }
+  if (!canvas) return;
 
-  // Use the HTML attribute dimensions — always reliable regardless of CSS layout state
-  const W = canvas.width  || 400;
-  const H = canvas.height || 160;
+  // Cancel any existing animation frame loop for this canvas ID
+  if (activeAnimationFrames[canvasId]) {
+    cancelAnimationFrame(activeAnimationFrames[canvasId]);
+    delete activeAnimationFrames[canvasId];
+  }
 
-  try {
-    const scene    = new THREE.Scene();
-    const camera   = new THREE.PerspectiveCamera(50, W / H, 0.1, 1000);
-    camera.position.z = 200;
+  // Determine actual rendered or attribute dimensions
+  const parent = canvas.parentElement;
+  const W = (parent && parent.clientWidth > 0) ? parent.clientWidth : (canvas.width || 400);
+  const H = (canvas.height > 0) ? canvas.height : 140;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setSize(W, H, false);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  canvas.width = W;
+  canvas.height = H;
 
-    let mainMesh;
+  // Attempt WebGL rendering with local Three.js
+  let webglSuccess = false;
+  if (typeof THREE !== 'undefined') {
+    try {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
+      camera.position.z = 180;
 
-    if (type === 'heart') {
-      mainMesh = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(55, 2),
-        new THREE.MeshBasicMaterial({ color: 0xda1e28, wireframe: true })
-      );
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(80, 1.2, 16, 64),
-        new THREE.MeshBasicMaterial({ color: 0x42be65, wireframe: true, transparent: true, opacity: 0.6 })
-      );
-      ring.rotation.x = Math.PI / 3;
-      mainMesh.add(ring);
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setSize(W, H, false);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    } else if (type === 'bloch') {
-      mainMesh = new THREE.Group();
-      const sphere = new THREE.Mesh(
-        new THREE.SphereGeometry(60, 16, 16),
-        new THREE.MeshBasicMaterial({ color: 0x8a3ffc, wireframe: true })
-      );
-      mainMesh.add(sphere);
-      // Equatorial ring
-      const r1 = new THREE.Mesh(
-        new THREE.TorusGeometry(82, 1.5, 12, 64),
-        new THREE.MeshBasicMaterial({ color: 0x0f62fe, transparent: true, opacity: 0.8 })
-      );
-      mainMesh.add(r1);
-      // Polar ring
-      const r2 = new THREE.Mesh(
-        new THREE.TorusGeometry(82, 1.5, 12, 64),
-        new THREE.MeshBasicMaterial({ color: 0xbe95ff, transparent: true, opacity: 0.5 })
-      );
-      r2.rotation.y = Math.PI / 2;
-      mainMesh.add(r2);
-      // State vector arrow (white rod)
-      const arrow = new THREE.Mesh(
-        new THREE.CylinderGeometry(2, 2, 100, 8),
-        new THREE.MeshBasicMaterial({ color: 0xffffff })
-      );
-      arrow.rotation.z = Math.PI / 6;
-      mainMesh.add(arrow);
+      let mainMesh;
 
-    } else if (type === 'dna') {
-      mainMesh = new THREE.Group();
-      for (let i = 0; i < 24; i++) {
-        const angle = i * 0.38;
-        const y     = (i - 12) * 7;
-        const s1 = new THREE.Mesh(new THREE.SphereGeometry(3.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0x0f62fe }));
-        s1.position.set(Math.cos(angle) * 38, y, Math.sin(angle) * 38);
-        const s2 = new THREE.Mesh(new THREE.SphereGeometry(3.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0x8a3ffc }));
-        s2.position.set(Math.cos(angle + Math.PI) * 38, y, Math.sin(angle + Math.PI) * 38);
-        mainMesh.add(s1, s2);
-        if (i % 3 === 0) {
-          const rung = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.8, 0.8, 76, 4),
-            new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.5 })
-          );
-          rung.position.set(0, y, 0);
-          rung.rotation.z = Math.PI / 2;
-          rung.rotation.y = angle;
-          mainMesh.add(rung);
+      if (type === 'heart') {
+        mainMesh = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(42, 2),
+          new THREE.MeshBasicMaterial({ color: 0xda1e28, wireframe: true })
+        );
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(60, 1, 16, 64),
+          new THREE.MeshBasicMaterial({ color: 0x42be65, wireframe: true, transparent: true, opacity: 0.7 })
+        );
+        ring.rotation.x = Math.PI / 3;
+        mainMesh.add(ring);
+
+      } else if (type === 'bloch') {
+        mainMesh = new THREE.Group();
+        // Wireframe sphere
+        const sphere = new THREE.Mesh(
+          new THREE.SphereGeometry(45, 16, 16),
+          new THREE.MeshBasicMaterial({ color: 0x8a3ffc, wireframe: true })
+        );
+        mainMesh.add(sphere);
+        // Equatorial orbit ring
+        const r1 = new THREE.Mesh(
+          new THREE.TorusGeometry(60, 1.2, 12, 64),
+          new THREE.MeshBasicMaterial({ color: 0x0f62fe, transparent: true, opacity: 0.85 })
+        );
+        r1.rotation.x = Math.PI / 4;
+        mainMesh.add(r1);
+        // Polar orbit ring
+        const r2 = new THREE.Mesh(
+          new THREE.TorusGeometry(60, 1.2, 12, 64),
+          new THREE.MeshBasicMaterial({ color: 0xbe95ff, transparent: true, opacity: 0.6 })
+        );
+        r2.rotation.y = Math.PI / 2;
+        mainMesh.add(r2);
+        // State vector arrow (cyan rod with top sphere)
+        const arrow = new THREE.Mesh(
+          new THREE.CylinderGeometry(2, 2, 80, 8),
+          new THREE.MeshBasicMaterial({ color: 0x00f0ff })
+        );
+        arrow.rotation.z = Math.PI / 5;
+        const tip = new THREE.Mesh(
+          new THREE.SphereGeometry(5, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0x00f0ff })
+        );
+        tip.position.y = 40;
+        arrow.add(tip);
+        mainMesh.add(arrow);
+
+      } else if (type === 'dna') {
+        mainMesh = new THREE.Group();
+        for (let i = 0; i < 22; i++) {
+          const angle = i * 0.38;
+          const y = (i - 11) * 6;
+          const s1 = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x0f62fe }));
+          s1.position.set(Math.cos(angle) * 32, y, Math.sin(angle) * 32);
+          const s2 = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x8a3ffc }));
+          s2.position.set(Math.cos(angle + Math.PI) * 32, y, Math.sin(angle + Math.PI) * 32);
+          mainMesh.add(s1, s2);
+          if (i % 3 === 0) {
+            const rung = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.8, 0.8, 64, 4),
+              new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.6 })
+            );
+            rung.position.set(0, y, 0);
+            rung.rotation.z = Math.PI / 2;
+            rung.rotation.y = angle;
+            mainMesh.add(rung);
+          }
         }
+
+      } else if (type === 'coldbox') {
+        mainMesh = new THREE.Group();
+        mainMesh.add(new THREE.Mesh(
+          new THREE.BoxGeometry(50, 50, 50),
+          new THREE.MeshBasicMaterial({ color: 0x0f62fe, wireframe: true })
+        ));
+        mainMesh.add(new THREE.Mesh(
+          new THREE.SphereGeometry(18, 10, 10),
+          new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.85 })
+        ));
+        const ant = new THREE.Mesh(
+          new THREE.CylinderGeometry(1, 1, 40, 6),
+          new THREE.MeshBasicMaterial({ color: 0xf1c21b })
+        );
+        ant.position.y = 40;
+        mainMesh.add(ant);
       }
 
-    } else if (type === 'coldbox') {
-      mainMesh = new THREE.Group();
-      mainMesh.add(new THREE.Mesh(
-        new THREE.BoxGeometry(70, 70, 70),
-        new THREE.MeshBasicMaterial({ color: 0x0f62fe, wireframe: true })
-      ));
-      mainMesh.add(new THREE.Mesh(
-        new THREE.SphereGeometry(22, 10, 10),
-        new THREE.MeshBasicMaterial({ color: 0x42be65, transparent: true, opacity: 0.85 })
-      ));
-      const ant = new THREE.Mesh(
-        new THREE.CylinderGeometry(1, 1, 50, 6),
-        new THREE.MeshBasicMaterial({ color: 0xf1c21b })
-      );
-      ant.position.y = 60;
-      mainMesh.add(ant);
+      if (mainMesh) scene.add(mainMesh);
+
+      let pTime = 0;
+      function animateWebGL() {
+        if (!document.getElementById(canvasId)) return;
+        activeAnimationFrames[canvasId] = requestAnimationFrame(animateWebGL);
+        pTime += 0.04;
+        if (mainMesh) {
+          mainMesh.rotation.y += 0.015;
+          mainMesh.rotation.x += 0.006;
+          if (type === 'heart') {
+            const s = 1 + Math.sin(pTime) * 0.08;
+            mainMesh.scale.set(s, s, s);
+          }
+        }
+        renderer.render(scene, camera);
+      }
+      animateWebGL();
+      webglSuccess = true;
+    } catch (err) {
+      console.warn('[3D] WebGL render attempt failed, switching to 2D vector fallback:', err);
     }
+  }
 
-    if (mainMesh) scene.add(mainMesh);
+  // ── 2D Canvas Mathematical 3D Vector Projection Fallback Engine ──────────
+  if (!webglSuccess) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    let pTime = 0;
-    (function animate() {
-      requestAnimationFrame(animate);
-      pTime += 0.05;
-      if (mainMesh) {
-        mainMesh.rotation.y += 0.015;
-        mainMesh.rotation.x += 0.006;
-        if (type === 'heart') {
-          const s = 1 + Math.sin(pTime) * 0.09;
-          mainMesh.scale.set(s, s, s);
+    let angleY = 0;
+    let angleX = 0.3;
+
+    function render2DFallback() {
+      if (!document.getElementById(canvasId)) return;
+      activeAnimationFrames[canvasId] = requestAnimationFrame(render2DFallback);
+      angleY += 0.02;
+      ctx.clearRect(0, 0, W, H);
+
+      const cx = W / 2;
+      const cy = H / 2;
+
+      ctx.save();
+
+      if (type === 'bloch' || type === 'heart') {
+        // Draw glowing 3D wireframe sphere with orbit ring and state vector
+        const radius = Math.min(W, H) * 0.32;
+
+        // Outer glow circle
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = (type === 'bloch') ? '#8a3ffc' : '#da1e28';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Equatorial ellipse
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, radius, radius * 0.35, angleY, 0, Math.PI * 2);
+        ctx.strokeStyle = '#0f62fe';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Polar ellipse
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, radius * 0.35, radius, angleY * 0.7, 0, Math.PI * 2);
+        ctx.strokeStyle = '#be95ff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Vector arrow line
+        const vx = cx + Math.cos(angleY) * radius * 0.8;
+        const vy = cy + Math.sin(angleY * 0.5) * radius * 0.6;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(vx, vy);
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Vector tip dot
+        ctx.beginPath();
+        ctx.arc(vx, vy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#00f0ff';
+        ctx.fill();
+
+      } else if (type === 'dna') {
+        // Draw 3D DNA strand
+        const r = 25;
+        for (let i = 0; i < 18; i++) {
+          const a = angleY + i * 0.4;
+          const y = cy + (i - 9) * 6;
+          const x1 = cx + Math.cos(a) * r;
+          const x2 = cx + Math.cos(a + Math.PI) * r;
+
+          ctx.beginPath();
+          ctx.arc(x1, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#0f62fe';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(x2, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#8a3ffc';
+          ctx.fill();
+
+          if (i % 3 === 0) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y);
+            ctx.lineTo(x2, y);
+            ctx.strokeStyle = 'rgba(66, 190, 101, 0.6)';
+            ctx.stroke();
+          }
         }
-      }
-      renderer.render(scene, camera);
-    })();
+      } else {
+        // Coldbox wireframe cube
+        const s = 30;
+        ctx.strokeStyle = '#0f62fe';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(cx - s, cy - s, s * 2, s * 2);
+        ctx.strokeRect(cx - s + 8, cy - s - 8, s * 2, s * 2);
 
-  } catch (err) {
-    console.warn('[3D] Embedded canvas failed:', canvasId, err);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#42be65';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+    render2DFallback();
   }
 }
+
 
 
 /**
