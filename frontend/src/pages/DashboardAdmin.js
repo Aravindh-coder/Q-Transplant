@@ -60,7 +60,7 @@ export function renderDashboardAdmin() {
           </p>
         </div>
         <div style="background:#161616; border-radius:10px; padding:12px; text-align:center;">
-          <canvas id="org-3d-bloch" style="width:100%; height:140px; display:block;"></canvas>
+          <canvas id="org-3d-bloch" width="400" height="140" style="width:100%; height:140px; display:block;"></canvas>
           <div style="font-size:10px; color:#6f6f6f; margin-top:6px; font-family:'IBM Plex Mono';">3D Grover Qubit Bloch Sphere — Live Vector</div>
         </div>
       </div>

@@ -125,7 +125,7 @@ export function renderDashboardDoctor() {
               <span style="font-size:13px; font-weight:700; color:#78a9ff;"><i class="fa-solid fa-heart-pulse"></i> 3D Organ Perfusion Telemetry</span>
               <span class="ticker-badge badge-matched" style="font-size:10px;">4.2°C STABLE</span>
             </div>
-            <canvas id="doc-3d-organ" style="width:100%; height:170px; background:rgba(0,0,0,0.4); border-radius:8px; display:block;"></canvas>
+            <canvas id="doc-3d-organ" width="400" height="170" style="width:100%; height:170px; background:rgba(0,0,0,0.4); border-radius:8px; display:block;"></canvas>
             <p style="font-size:10px; color:#8d8d8d; margin:6px 0 0 0;">
               <i class="fa-solid fa-atom" style="color:#0f62fe;"></i> Live 3D Organ Wireframe Mesh — Pulsating at 60 BPM Perfusion
             </p>

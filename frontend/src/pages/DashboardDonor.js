@@ -59,7 +59,7 @@ export function renderDashboardDonor() {
           <div style="font-size:12px; font-weight:700; color:#78a9ff; margin-bottom:6px;">
             <i class="fa-solid fa-dna"></i> 3D HLA DNA Helix Model
           </div>
-          <canvas id="dnr-3d-dna" style="width:100%; flex:1; min-height:140px; background:rgba(0,0,0,0.4); border-radius:8px; display:block;"></canvas>
+          <canvas id="dnr-3d-dna" width="350" height="160" style="width:100%; height:160px; background:rgba(0,0,0,0.4); border-radius:8px; display:block;"></canvas>
           <p style="font-size:10px; color:#6f6f6f; margin:6px 0 0 0;">Live HLA Genetic Compatibility Strand</p>
         </div>
 

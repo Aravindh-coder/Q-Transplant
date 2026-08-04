@@ -129,7 +129,7 @@ export function renderDashboardHospital() {
               <span style="font-size:13px; font-weight:700; color:#78a9ff;"><i class="fa-solid fa-microchip"></i> ESP32 Cold Box IoT Node</span>
               <span class="ticker-badge badge-matched" style="font-size:10px;">● LIVE TELEMETRY</span>
             </div>
-            <canvas id="hsp-3d-coldbox" style="width:100%; height:160px; background:rgba(0,0,0,0.5); border-radius:8px; display:block;"></canvas>
+            <canvas id="hsp-3d-coldbox" width="400" height="160" style="width:100%; height:160px; background:rgba(0,0,0,0.5); border-radius:8px; display:block;"></canvas>
             <p style="font-size:10px; color:#6f6f6f; margin:6px 0 0 0; font-family:'IBM Plex Mono';">3D ESP32 Cold Box Transport Node — IoT Mesh Network</p>
           </div>
 
