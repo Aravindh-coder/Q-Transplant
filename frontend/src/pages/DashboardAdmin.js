@@ -5,8 +5,6 @@ export function renderDashboardAdmin() {
   const pending = state.pendingUsers || [];
   const allUsersDetailed = state.allUsersDetailed || { doctors: [], hospitals: [], donors: [], patients: [] };
 
-  setTimeout(() => initEmbedded3DCanvas('org-3d-bloch', 'bloch'), 120);
-
   return `
     <div style="animation: fadeInUp 0.4s ease;">
 

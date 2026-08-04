@@ -6,8 +6,6 @@ export function renderDashboardHospital() {
   const organs = state.organs || [];
   const matches = state.matches || [];
 
-  setTimeout(() => initEmbedded3DCanvas('hsp-3d-coldbox', 'coldbox'), 120);
-
   return `
     <div style="animation: fadeInUp 0.4s ease;">
 

@@ -5,8 +5,6 @@ import { initEmbedded3DCanvas } from '../services/three3d.js';
 export function renderDashboardDonor() {
   const user = state.currentUser || { full_name: 'David Miller' };
 
-  setTimeout(() => initEmbedded3DCanvas('dnr-3d-dna', 'dna'), 120);
-
   return `
     <div style="animation: fadeInUp 0.4s ease;">
 

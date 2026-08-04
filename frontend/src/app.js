@@ -14,7 +14,7 @@ import { renderDashboardHospital } from './pages/DashboardHospital.js';
 import { renderDashboardDonor } from './pages/DashboardDonor.js';
 import { renderDashboardPatient } from './pages/DashboardPatient.js';
 
-import { init3DBackground, attach3DTiltEffects } from './services/three3d.js';
+import { init3DBackground, attach3DTiltEffects, initEmbedded3DCanvas } from './services/three3d.js';
 
 
 import { renderQuantumMatchView, attachQuantumMatchEvents } from './pages/QuantumMatchView.js';
@@ -145,6 +145,19 @@ function renderApp() {
   // Initialize 3D Motion Particle Canvas & 3D Depth Card Tilt effects across every page
   init3DBackground();
   setTimeout(() => attach3DTiltEffects(), 100);
+
+  // Initialize embedded 3D WebGL canvases inside portal dashboard cards
+  setTimeout(() => {
+    const canvasMap = [
+      ['doc-3d-organ', 'heart'],
+      ['org-3d-bloch', 'bloch'],
+      ['dnr-3d-dna', 'dna'],
+      ['hsp-3d-coldbox', 'coldbox']
+    ];
+    canvasMap.forEach(([id, type]) => {
+      if (document.getElementById(id)) initEmbedded3DCanvas(id, type);
+    });
+  }, 300);
 }
 
 

@@ -5,8 +5,6 @@ export function renderDashboardDoctor() {
   const user = state.currentUser || { full_name: 'Dr. Rajesh Kumar', is_approved: true };
   const isApproved = user.is_approved !== false;
 
-  setTimeout(() => initEmbedded3DCanvas('doc-3d-organ', 'heart'), 120);
-
   return `
     <div style="animation: fadeInUp 0.4s ease;">
 
