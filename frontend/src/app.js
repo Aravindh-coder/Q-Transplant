@@ -752,12 +752,119 @@ async function loadSystemData(showToast = false) {
   renderApp();
 }
 
+let lastEmergencyStatus = null;
+
+async function pollEmergencyHardwareState() {
+  try {
+    const res = await fetch('/api/v1/emergency/current-state');
+    if (!res.ok) return;
+    const stateData = await res.json();
+    state.emergencyState = stateData;
+
+    // Check if status changed
+    if (stateData.status !== lastEmergencyStatus) {
+      lastEmergencyStatus = stateData.status;
+
+      // Play alert sound if status changed to SEARCHING or DONOR_MATCHED
+      if (stateData.status === 'SEARCHING') {
+        ToastManager.show(`🚨 ESP32 ALERT: Emergency request triggered by ${stateData.hospital_name || 'Hospital'}!`, 'error');
+      } else if (stateData.status === 'DONOR_MATCHED') {
+        ToastManager.show(`💚 ESP32 ALERT: Donor organ matched from ${stateData.donor_hospital || 'Network Hospital'}!`, 'success');
+      } else if (stateData.status === 'ACKNOWLEDGED') {
+        ToastManager.show(`✔ ESP32 ALERT: Emergency acknowledged by flight crew!`, 'info');
+      }
+    }
+
+    // Update or inject live banner on dashboard views
+    updateLiveESP32Banner(stateData);
+  } catch (err) {
+    // Silent fail on network poll
+  }
+}
+
+function updateLiveESP32Banner(st) {
+  let banner = document.getElementById('esp32-live-hardware-banner');
+  if (!st || st.status === 'IDLE') {
+    if (banner) banner.remove();
+    return;
+  }
+
+  const mainContent = document.querySelector('main.bx--content') || document.querySelector('.dash-header');
+  if (!mainContent) return;
+
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'esp32-live-hardware-banner';
+    banner.style.cssText = 'margin-bottom:1.5rem; padding:1rem 1.5rem; border-radius:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; animation:fadeInUp 0.3s ease;';
+    const parentContainer = mainContent.parentElement || mainContent;
+    parentContainer.insertBefore(banner, parentContainer.firstChild);
+  }
+
+  if (st.status === 'SEARCHING') {
+    banner.style.background = 'rgba(218, 30, 40, 0.15)';
+    banner.style.border = '1px solid #da1e28';
+    banner.style.color = '#ff8389';
+    banner.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:12px; height:12px; border-radius:50%; background:#da1e28; animation:pulse-glow 1s infinite;"></div>
+        <div>
+          <strong style="font-size:14px; color:#ff8389;"><i class="fa-solid fa-microchip"></i> ESP32 HARDWARE ALERT: EMERGENCY IN PROGRESS</strong>
+          <div style="font-size:12px; color:#f4f4f4; margin-top:2px;">
+            ${st.hospital_name || 'Hospital Node'} &nbsp;·&nbsp; Organ: <strong>${st.organ_needed || 'Heart'} (${st.blood_type || 'O+'})</strong> &nbsp;·&nbsp; Box: ${st.cold_box_id || 'BOX-ESP32-001'}
+          </div>
+        </div>
+      </div>
+      <button onclick="fetch('/api/v1/emergency/acknowledge',{method:'POST'})" class="btn-call" style="background:#198038; border-color:#198038; font-size:11px; padding:6px 14px; cursor:pointer;">
+        <i class="fa-solid fa-check-double"></i> ACKNOWLEDGE ALERT (BTN 3)
+      </button>
+    `;
+  } else if (st.status === 'DONOR_MATCHED') {
+    banner.style.background = 'rgba(25, 128, 56, 0.15)';
+    banner.style.border = '1px solid #198038';
+    banner.style.color = '#42be65';
+    banner.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:12px; height:12px; border-radius:50%; background:#42be65; animation:pulse-glow 1.5s infinite;"></div>
+        <div>
+          <strong style="font-size:14px; color:#42be65;"><i class="fa-solid fa-hand-holding-heart"></i> ESP32 SIGNAL: DONOR ORGAN MATCH FOUND</strong>
+          <div style="font-size:12px; color:#f4f4f4; margin-top:2px;">
+            Donor Node: <strong>${st.donor_hospital || 'Fortis Healthcare'}</strong> &nbsp;·&nbsp; ${st.donor_organ || 'Heart'} (${st.donor_blood_type || 'O+'}) ready for transport
+          </div>
+        </div>
+      </div>
+      <button onclick="fetch('/api/v1/emergency/reset',{method:'POST'})" class="btn-call" style="background:#0f62fe; border-color:#0f62fe; font-size:11px; padding:6px 14px; cursor:pointer;">
+        <i class="fa-solid fa-rotate-left"></i> CLEAR STATE
+      </button>
+    `;
+  } else if (st.status === 'ACKNOWLEDGED') {
+    banner.style.background = 'rgba(15, 98, 254, 0.15)';
+    banner.style.border = '1px solid #0f62fe';
+    banner.style.color = '#78a9ff';
+    banner.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <i class="fa-solid fa-circle-check" style="font-size:1.2rem; color:#78a9ff;"></i>
+        <div>
+          <strong style="font-size:13px; color:#78a9ff;">ESP32 ALERT ACKNOWLEDGED BY FLIGHT CREW</strong>
+          <div style="font-size:11px; color:#c6c6c6;">Emergency siren quieted. Box in active transport monitor mode.</div>
+        </div>
+      </div>
+      <button onclick="fetch('/api/v1/emergency/reset',{method:'POST'})" class="btn-call" style="background:#393939; border-color:#525252; font-size:11px; padding:4px 10px; cursor:pointer;">
+        Reset to Normal
+      </button>
+    `;
+  }
+}
+
 subscribe(renderApp);
 
 window.addEventListener('hashchange', checkHashForResetToken);
 
 document.addEventListener('DOMContentLoaded', async () => {
   initWebSocket();
+
+  // Start fast ESP32 hardware button state polling (every 1.5s)
+  setInterval(pollEmergencyHardwareState, 1500);
+
   const token = localStorage.getItem('access_token');
   if (token) {
     try {
@@ -774,3 +881,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   renderApp();
 });
+
