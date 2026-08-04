@@ -9,8 +9,9 @@
 #define WIFI_SSID "YOUR_WIFI_SSID"
 #define WIFI_PASS "YOUR_WIFI_PASSWORD"
 
-// Q-Transplant Server Host IP (Replace with your laptop/server IP address)
-#define BACKEND_HOST "http://192.168.1.100:8080"  // e.g. http://192.168.1.50:8080
+// Q-Transplant Server Host IP — Your machine's LAN IP
+// Run: hostname -I  to verify this is still correct
+#define BACKEND_HOST "http://10.155.109.198:8080"  // Updated: your machine IP
 
 // API Endpoints
 #define TELEMETRY_ENDPOINT "/api/v1/telemetry/push"
