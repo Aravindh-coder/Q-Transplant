@@ -1,6 +1,5 @@
 /**
  * Q-Transplant ESP32 DevKit Organ Transport Node Firmware
- * Multi-Button Control + SSD1306 OLED + Telemetry + Emergency Siren
  */
 
 #include <Arduino.h>
@@ -12,10 +11,8 @@
 #include <Adafruit_SSD1306.h>
 #include "config.h"
 
-// OLED Display Instance
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// State Variables
 unsigned long lastTelemetryTime = 0;
 bool isEmergencyState = false;
 bool isDonorReady = false;
@@ -36,7 +33,7 @@ void connectWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   int retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries < 30) { // 15s timeout
+  while (WiFi.status() != WL_CONNECTED && retries < 30) {
     delay(500);
     Serial.print(".");
     retries++;
@@ -58,22 +55,19 @@ void updateOLED(const String& statusLine, const String& infoLine) {
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   
-  // Header Bar
   display.setCursor(0, 0);
   display.println("=== Q-TRANSPLANT ===");
   display.setCursor(0, 10);
   display.printf("BOX: %s\n", COLD_BOX_ID);
   display.drawLine(0, 20, 128, 20, SSD1306_WHITE);
 
-  // Temperature & Battery
   display.setCursor(0, 24);
   display.printf("Temp: %.1f C  Hum: %.0f%%\n", simulatedTemp, simulatedHumidity);
   display.setCursor(0, 34);
   display.printf("Bat : %.0f%%   WiFi: %s\n", batteryLevel, WiFi.status() == WL_CONNECTED ? "OK" : "ERR");
 
-  // Status Line
   display.setCursor(0, 46);
-  display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); // Inverted text for emphasis
+  display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
   display.println(statusLine);
   display.setTextColor(SSD1306_WHITE);
   
@@ -137,7 +131,6 @@ void triggerEmergency() {
   serializeJson(doc, payload);
   sendHttpPost(EMERGENCY_ENDPOINT, payload);
 
-  // Alarm Pattern: Beep & Red Flash
   for (int i = 0; i < 6; i++) {
     digitalWrite(LED_RED, HIGH);
     digitalWrite(BUZZER_PIN, HIGH);
@@ -154,19 +147,16 @@ void triggerDonorAvailable() {
   updateOLED("DONOR ORGAN READY", "Heart (O+) Signal");
 
   StaticJsonDocument<256> doc;
-  doc["donor_id"] = 1;
+  doc["hospital_name"] = "Fortis Healthcare, Bengaluru";
   doc["organ_type"] = "Heart";
   doc["blood_type"] = "O+";
   doc["hla_type"] = "A2,B7,DR4";
-  doc["max_ischemia_hours"] = 4.0;
   doc["cold_box_id"] = COLD_BOX_ID;
-  doc["status"] = "available";
 
   String payload;
   serializeJson(doc, payload);
-  sendHttpPost("/api/v1/organs/", payload);
+  sendHttpPost("/api/v1/emergency/donor-available", payload);
 
-  // Double chime on buzzer
   digitalWrite(LED_GREEN, HIGH);
   digitalWrite(BUZZER_PIN, HIGH); delay(80); digitalWrite(BUZZER_PIN, LOW); delay(80);
   digitalWrite(BUZZER_PIN, HIGH); delay(120); digitalWrite(BUZZER_PIN, LOW);
@@ -181,7 +171,12 @@ void acknowledgeAlert() {
   digitalWrite(LED_GREEN, HIGH);
   updateOLED("SYSTEM NORMAL", "Cold-Box Sealed");
 
-  // Soft confirmation beep
+  StaticJsonDocument<128> doc;
+  doc["cold_box_id"] = COLD_BOX_ID;
+  String payload;
+  serializeJson(doc, payload);
+  sendHttpPost("/api/v1/emergency/acknowledge", payload);
+
   digitalWrite(BUZZER_PIN, HIGH); delay(50); digitalWrite(BUZZER_PIN, LOW);
 }
 
@@ -189,7 +184,6 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n[START] Q-Transplant ESP32 Cold-Box Controller Starting...");
 
-  // Initialize Pin Modes
   pinMode(BTN_EMERGENCY, INPUT_PULLUP);
   pinMode(BTN_DONOR, INPUT_PULLUP);
   pinMode(BTN_ACKNOWLEGE, INPUT_PULLUP);
@@ -202,7 +196,6 @@ void setup() {
   digitalWrite(LED_RED, LOW);
   digitalWrite(BUZZER_PIN, LOW);
 
-  // Initialize I2C for SSD1306 OLED
   Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
     Serial.println("[ERROR] SSD1306 OLED Display allocation failed!");
@@ -211,18 +204,16 @@ void setup() {
     updateOLED("SYSTEM INITIALIZING", "Connecting Wi-Fi");
   }
 
-  // Connect to Wi-Fi
   connectWiFi();
   updateOLED("SYSTEM READY", "Box Sealed OK");
 }
 
 void loop() {
-  // 1. Check Button Inputs (INPUT_PULLUP: Pressed = LOW)
   if (digitalRead(BTN_EMERGENCY) == LOW) {
-    delay(50); // Debounce
+    delay(50);
     if (digitalRead(BTN_EMERGENCY) == LOW) {
       triggerEmergency();
-      while(digitalRead(BTN_EMERGENCY) == LOW); // Wait release
+      while(digitalRead(BTN_EMERGENCY) == LOW);
     }
   }
 
@@ -242,11 +233,9 @@ void loop() {
     }
   }
 
-  // 2. Periodic Telemetry Push
   if (millis() - lastTelemetryTime >= TELEMETRY_INTERVAL_MS) {
     lastTelemetryTime = millis();
     
-    // Simulate minor ambient fluctuations
     simulatedTemp = 4.0 + (random(-3, 4) / 10.0);
     simulatedHumidity = 84.0 + (random(-5, 5) / 10.0);
     batteryLevel = max(10.0f, batteryLevel - 0.005f);
