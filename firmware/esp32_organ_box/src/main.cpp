@@ -29,9 +29,14 @@ void connectWiFi() {
   Serial.printf("[WIFI] Connecting to %s...\n", WIFI_SSID);
   updateOLED("CONNECTING WIFI", WIFI_SSID);
   
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+
   int retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries < 15) {
+  while (WiFi.status() != WL_CONNECTED && retries < 30) { // 15s timeout
     delay(500);
     Serial.print(".");
     retries++;
@@ -43,7 +48,7 @@ void connectWiFi() {
     digitalWrite(LED_GREEN, HIGH);
   } else {
     Serial.println("\n[WIFI] Connection failed. Running in Offline Mode.");
-    updateOLED("WIFI OFFLINE", "Local Telemetry");
+    updateOLED("WIFI OFFLINE", "Check 2.4GHz/Pass");
   }
   delay(1000);
 }

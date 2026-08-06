@@ -38,9 +38,9 @@
 // ==============================================================================
 // CONFIGURATION - UPDATE THESE VALUES FOR YOUR NETWORK
 // ==============================================================================
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";       // Your Wi-Fi Name
-const char* WIFI_PASS     = "YOUR_WIFI_PASSWORD";   // Your Wi-Fi Password
-const char* BACKEND_HOST  = "http://192.168.1.100:8080"; // Your PC local IP address + port 8080
+const char* WIFI_SSID     = "Aravindh_Hotspot";       // Your Wi-Fi Name
+const char* WIFI_PASS     = "Qtransplant123";   // Your Wi-Fi Password
+const char* BACKEND_HOST  = "http://10.155.109.198:8080"; // Your PC local IP address + port 8080
 
 // Box Identification
 const char* COLD_BOX_ID   = "BOX-ESP32-001";

@@ -5,9 +5,9 @@
 // Q-TRANSPLANT ESP32 DEVKIT HARDWARE CONFIGURATION & PIN MAPPING
 // ==============================================================================
 
-// WiFi Credentials (Update with your local Wi-Fi SSID and Password)
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+// WiFi Credentials (Update with your local Wi‑Fi SSID and Password)
+#define WIFI_SSID "Aravindh_Hotspot"
+#define WIFI_PASS "Qtransplant123"
 
 // Q-Transplant Server Host IP — Your machine's LAN IP
 // Run: hostname -I  to verify this is still correct
