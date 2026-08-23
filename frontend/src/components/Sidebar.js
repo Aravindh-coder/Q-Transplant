@@ -121,6 +121,12 @@ export function renderSidebar() {
               <span>Grover Match Engine</span>
             </a>
           </li>
+          <li>
+            <a href="#" data-tab="donor-search" class="bx--side-nav__link ${active === 'donor-search' ? 'active' : ''}">
+              <i class="fa-solid fa-magnifying-glass" style="color:#be95ff;"></i>
+              <span>Search for Donor</span>
+            </a>
+          </li>
         ` : ''}
         <li>
           <a href="#" data-tab="telemetry" class="bx--side-nav__link ${active === 'telemetry' ? 'active' : ''}">

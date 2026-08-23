@@ -1,4 +1,4 @@
-import { playEmergencyAlertSound, playDonorMatchSound, playAckSound } from '../services/sound.js';
+import { playEmergencyAlertSound, playDonorMatchSound, playAckSound, startAmbulanceSiren, stopAmbulanceSiren, playHappyAckSound } from '../services/sound.js';
 
 let lastSeenStatus = null;
 
@@ -611,9 +611,13 @@ function renderStatusCard(state) {
 
   // Play audio alert if status changed
   if (lastSeenStatus !== state.status) {
-    if (state.status === 'SEARCHING') playEmergencyAlertSound();
-    if (state.status === 'DONOR_MATCHED') playDonorMatchSound();
-    if (state.status === 'ACKNOWLEDGED') playAckSound();
+    if (state.status === 'SEARCHING') {
+      startAmbulanceSiren(); // real looping ambulance wail — keeps going while searching
+    } else {
+      stopAmbulanceSiren(); // any other state: cut the siren
+    }
+    if (state.status === 'DONOR_MATCHED') playDonorMatchSound();       // ~3s donor-found cue
+    if (state.status === 'ACKNOWLEDGED') playHappyAckSound();          // happy resolution jingle
     lastSeenStatus = state.status;
   }
 
@@ -672,18 +676,31 @@ function renderStatusCard(state) {
     body.innerHTML = `
       <i class="fa-solid fa-hospital-user" style="font-size:3rem;color:#42be65;margin-bottom:1rem;display:block;"></i>
       <div style="color:#42be65;font-size:18px;font-weight:700;margin-bottom:1rem;">✅ DONOR HOSPITAL CONFIRMED</div>
+
+      <!-- Donor hospital identity card: photo + name + details, shown immediately -->
+      <div style="display:flex;align-items:center;gap:14px;background:#052e16;border:2px solid #42be65;border-radius:10px;padding:14px;max-width:480px;margin:0 auto 0.85rem auto;text-align:left;">
+        <img src="${state.donor_hospital_image_url || ''}" alt="${state.donor_hospital || 'Donor Hospital'}"
+             style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid #42be65;flex-shrink:0;" />
+        <div>
+          <div style="font-size:10px;color:#86efac;text-transform:uppercase;letter-spacing:0.5px;">🏥 Donor Hospital — Organ Available Now</div>
+          <div style="color:#42be65;font-weight:700;font-size:15px;">${state.donor_hospital || '—'}</div>
+          <div style="color:#86efac;font-size:11px;">${state.donor_organ || ''} (${state.donor_blood_type || ''})</div>
+        </div>
+      </div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;text-align:left;max-width:480px;margin:0 auto;">
         <div style="background:#1a1a1a;border:1px solid #42be65;border-radius:8px;padding:12px;">
           <div style="font-size:10px;color:#8d8d8d;text-transform:uppercase;margin-bottom:4px;">Requesting Hospital</div>
           <div style="color:#f4f4f4;font-weight:600;font-size:13px;">${state.hospital_name || '—'}</div>
           <div style="color:#8d8d8d;font-size:11px;">Needs: ${state.organ_needed || '—'} (${state.blood_type || '—'})</div>
         </div>
-        <div style="background:#052e16;border:2px solid #42be65;border-radius:8px;padding:12px;">
-          <div style="font-size:10px;color:#86efac;text-transform:uppercase;margin-bottom:4px;">🏥 Donor Hospital</div>
-          <div style="color:#42be65;font-weight:700;font-size:14px;">${state.donor_hospital || '—'}</div>
-          <div style="color:#86efac;font-size:11px;">${state.donor_organ || ''} (${state.donor_blood_type || ''}) — Available Now</div>
+        <div style="background:#0a1f3d;border:1px solid #78a9ff;border-radius:8px;padding:12px;">
+          <div style="font-size:10px;color:#a6c8ff;text-transform:uppercase;margin-bottom:4px;"><i class="fa-solid fa-route"></i> Transit Estimate</div>
+          <div style="color:#78a9ff;font-weight:700;font-size:16px;">${state.eta_minutes != null ? state.eta_minutes + ' min' : '—'}</div>
+          <div style="color:#a6c8ff;font-size:11px;">${state.distance_km != null ? state.distance_km + ' km' : '—'} · Green-corridor ambulance</div>
         </div>
       </div>
+
       <div style="margin-top:1rem;background:rgba(66,190,101,0.1);border-radius:8px;padding:12px;color:#42be65;font-size:12px;">
         <i class="fa-solid fa-truck-medical"></i> Transport team dispatched · Press BTN 3 (Acknowledge) once crew confirms
       </div>

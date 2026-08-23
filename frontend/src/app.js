@@ -18,6 +18,7 @@ import { init3DBackground, attach3DTiltEffects, initEmbedded3DCanvas } from './s
 
 
 import { renderQuantumMatchView, attachQuantumMatchEvents } from './pages/QuantumMatchView.js';
+import { renderDonorSearchView, attachDonorSearchEvents } from './pages/DonorSearchView.js';
 import { renderTelemetryGauge } from './components/TelemetryGauge.js';
 import { renderAIPredictionView, attachAIPredictionEvents } from './pages/AIPredictionView.js';
 import { renderDigitalTwinView, attachDigitalTwinEvents } from './pages/DigitalTwinView.js';
@@ -138,6 +139,7 @@ function renderApp() {
   if (state.activeTab === 'slime-mould') attachSlimeMouldBenchmarkEvents();
   if (state.activeTab === 'synthetic') attachSyntheticDataEvents();
   if (state.activeTab === 'matching') attachQuantumMatchEvents();
+  if (state.activeTab === 'donor-search') attachDonorSearchEvents();
 
 
   attachAIAssistantEvents();
@@ -270,6 +272,10 @@ function renderActiveTab() {
 
   if (tab === 'matching') {
     return renderQuantumMatchView();
+  }
+
+  if (tab === 'donor-search') {
+    return renderDonorSearchView();
   }
 
   if (tab === 'gis-command') return renderNationalCommandCenterView();
