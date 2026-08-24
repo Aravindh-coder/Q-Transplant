@@ -3,10 +3,11 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.core.config import settings
+from backend.app.core.logging import logger
 from backend.app.core.security import (
     get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, oauth2_scheme
 )
@@ -26,8 +27,31 @@ os.makedirs(AVATARS_DIR, exist_ok=True)
 os.makedirs(CERTIFICATES_DIR, exist_ok=True)
 
 
+def _safe_send_registration_emails(user_id: int, email: str, full_name: str, role: str, details: dict, doc_avatar_url: Optional[str] = None):
+    """Runs after the HTTP response has already been sent (via BackgroundTasks),
+    so a slow or failing SMTP server can NEVER delay or break registration.
+    Also defensively catches anything EmailService.send_email's own try/except
+    might not, so a background failure only ever gets logged — never raised."""
+    try:
+        EmailService.send_registration_ack(email, full_name, role, details)
+    except Exception as e:
+        logger.error(f"[background email] registration ack failed for {email}: {e}")
+    try:
+        if role.lower() != "organizer":
+            EmailService.send_generic_verification_request(
+                user_id=user_id,
+                name=full_name,
+                email=email,
+                role=role,
+                details=details,
+                avatar_url=doc_avatar_url
+            )
+    except Exception as e:
+        logger.error(f"[background email] organizer verification request failed for {email}: {e}")
+
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register_user(payload: UserRegister, db: Session = Depends(get_db)):
+def register_user(payload: UserRegister, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     repo = UserRepository(db)
     audit = AuditRepository(db)
 
@@ -124,25 +148,25 @@ def register_user(payload: UserRegister, db: Session = Depends(get_db)):
             "Phone": payload.phone or "N/A"
         }
 
-    # Send Ack Email to registrant with all entered details
-    EmailService.send_registration_ack(user.email, user.full_name, user.role, details)
-
-    # Send verification request with One-Click Approve / Reject links to Organizer
-    if payload.role.lower() != "organizer":
-        EmailService.send_generic_verification_request(
-            user_id=user.id,
-            name=user.full_name,
-            email=user.email,
-            role=user.role,
-            details=details,
-            avatar_url=getattr(doc_profile, 'avatar_url', None) if doc_profile else None
-        )
+    # Send acknowledgment + organizer verification emails AFTER the response is
+    # sent — SMTP can be slow or fail entirely without ever blocking or
+    # breaking this registration request.
+    background_tasks.add_task(
+        _safe_send_registration_emails,
+        user_id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        details=details,
+        doc_avatar_url=getattr(doc_profile, 'avatar_url', None) if doc_profile else None
+    )
 
     return user
 
 
 @router.post("/register-doctor-camera", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_doctor_camera(
+    background_tasks: BackgroundTasks,
     email: str = Form(...),
     password: str = Form(...),
     full_name: str = Form(...),
@@ -193,20 +217,28 @@ def register_doctor_camera(
 
     audit.log_action(user_id=user.id, action="REGISTER_CAMERA", resource="Doctor", details=f"Saved camera capture: {filename}")
 
-    # 1. Immediate ACK Email to Doctor
-    EmailService.send_registration_ack(user.email, user.full_name, "doctor")
+    # Both notification emails run AFTER the response is sent — SMTP delays
+    # or failures can never block or break the doctor's registration.
+    def _send_camera_reg_emails():
+        try:
+            EmailService.send_registration_ack(user.email, user.full_name, "doctor")
+        except Exception as e:
+            logger.error(f"[background email] camera-reg ack failed for {user.email}: {e}")
+        try:
+            EmailService.send_verification_request_to_organizer(
+                user_id=user.id,
+                name=user.full_name,
+                email=user.email,
+                spec=doc.specialization,
+                license_num=doc.medical_license,
+                dept=doc.department,
+                phone=phone,
+                avatar_url=avatar_url
+            )
+        except Exception as e:
+            logger.error(f"[background email] camera-reg organizer notice failed for {user.email}: {e}")
 
-    # 2. Immediate Verification Request Email to Organizer (Admin) with photo & One-Click Buttons
-    EmailService.send_verification_request_to_organizer(
-        user_id=user.id,
-        name=user.full_name,
-        email=user.email,
-        spec=doc.specialization,
-        license_num=doc.medical_license,
-        dept=doc.department,
-        phone=phone,
-        avatar_url=avatar_url
-    )
+    background_tasks.add_task(_send_camera_reg_emails)
 
     return user
 
