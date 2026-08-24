@@ -32,7 +32,10 @@ export function renderDonorSearchView() {
               <input type="file" id="ds-csv-input" accept=".csv" style="display:none;" />
             </label>
             <button id="ds-seed-demo-btn" class="bx--btn bx--btn--secondary" style="padding:8px 16px;font-size:12px;border-radius:6px;">
-              <i class="fa-solid fa-database"></i> Seed 1,000 Demo Donors
+              <i class="fa-solid fa-dice"></i> Seed 1,000 Random Donors
+            </button>
+            <button id="ds-load-sample-btn" class="bx--btn bx--btn--primary" style="padding:8px 16px;font-size:12px;border-radius:6px;">
+              <i class="fa-solid fa-stethoscope"></i> Load Realistic 1,000-Donor Dataset
             </button>
             <button id="ds-clear-pool-btn" class="bx--btn bx--btn--secondary" style="padding:8px 16px;font-size:12px;border-radius:6px;background:#da1e28;">
               <i class="fa-solid fa-trash"></i> Clear Pool
@@ -276,6 +279,18 @@ export function attachDonorSearchEvents() {
       refreshPoolStats();
     } catch (err) {
       ToastManager.show('Failed to seed demo donors', 'error');
+    }
+  });
+
+  document.getElementById('ds-load-sample-btn')?.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/v1/donor-search/load-sample-dataset', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to load sample dataset');
+      ToastManager.show(`✅ Loaded realistic dataset — ${data.rows_added} donors with medical records ready`, 'success');
+      refreshPoolStats();
+    } catch (err) {
+      ToastManager.show(err.message, 'error');
     }
   });
 

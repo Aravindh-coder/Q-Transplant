@@ -9,6 +9,7 @@ emergency.py, so no DB migration is required for the demo.
 import csv
 import io
 import math
+import os
 import random
 import uuid
 from datetime import datetime, timezone
@@ -18,6 +19,12 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/donor-search", tags=["Donor Pool & Grover Search"])
+
+# Bundled realistic 1000-donor demo dataset (data/donor_dataset_1000.csv at repo
+# root) — resolved relative to this file so it works regardless of the CWD
+# uvicorn is launched from.
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+SAMPLE_DATASET_PATH = os.path.join(_REPO_ROOT, "data", "donor_dataset_1000.csv")
 
 # ── In-memory donor pool (populated via CSV upload by doctors, or demo-seeded) ──
 _donor_pool: List[dict] = []
@@ -110,18 +117,8 @@ def seed_demo_pool(count: int = 1000, append: bool = False):
     return {"status": "SEEDED", "pool_size": len(_donor_pool)}
 
 
-# ── Doctors upload real donor CSVs here (cumulative — appends to the pool) ──
-@router.post("/upload-csv", status_code=status.HTTP_201_CREATED)
-async def upload_donor_csv(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Please upload a .csv file")
-
-    raw = await file.read()
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = raw.decode("latin-1")
-
+# ── Shared CSV-row parser (used by both file-upload and the bundled sample) ──
+def _parse_and_ingest_csv_text(text: str) -> tuple:
     reader = csv.DictReader(io.StringIO(text))
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="CSV appears empty or malformed")
@@ -169,12 +166,56 @@ async def upload_donor_csv(file: UploadFile = File(...)):
             "lng": lng,
             "registered_by": col(row, "registered_by", "doctor", default="Attending Doctor"),
             "registered_at": datetime.now(timezone.utc).isoformat(),
-            "source": "csv_upload",
+            "source": col(row, "source", default="csv_upload"),
         })
         added += 1
 
+    return added, skipped
+
+
+# ── Doctors upload real donor CSVs here (cumulative — appends to the pool) ──
+@router.post("/upload-csv", status_code=status.HTTP_201_CREATED)
+async def upload_donor_csv(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Please upload a .csv file")
+
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+
+    added, skipped = _parse_and_ingest_csv_text(text)
+
     return {
         "status": "UPLOADED",
+        "rows_added": added,
+        "rows_skipped": skipped,
+        "pool_size": len(_donor_pool),
+    }
+
+
+# ── One-click loader for the bundled realistic 1000-donor demo dataset —
+# no file picker needed, safe for live judge/demo presentations. ──
+@router.post("/load-sample-dataset")
+def load_sample_dataset(append: bool = False):
+    if not os.path.exists(SAMPLE_DATASET_PATH):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Bundled sample dataset not found at {SAMPLE_DATASET_PATH}. "
+                   f"Expected data/donor_dataset_1000.csv at the repo root."
+        )
+
+    if not append:
+        _donor_pool.clear()
+
+    with open(SAMPLE_DATASET_PATH, "r", encoding="utf-8-sig") as f:
+        text = f.read()
+
+    added, skipped = _parse_and_ingest_csv_text(text)
+
+    return {
+        "status": "LOADED",
         "rows_added": added,
         "rows_skipped": skipped,
         "pool_size": len(_donor_pool),

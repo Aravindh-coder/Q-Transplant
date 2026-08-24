@@ -22,6 +22,74 @@ float batteryLevel = 98.0;
 
 void updateOLED(const String& statusLine, const String& infoLine = "");
 
+// ==============================================================================
+// SOUND EFFECTS — mirrors the web app's sound.js so the physical box and the
+// dashboard "feel" like the same event (ambulance siren / donor chime / happy
+// jingle).
+//
+// ⚠ BUZZER TYPE MATTERS: a PASSIVE buzzer (3-legged, no black epoxy dome) will
+// reproduce the real pitch-sweeping wail via tone(). An ACTIVE buzzer (has a
+// small black dome, fixed single pitch) will still play the correct on/off
+// RHYTHM but won't sweep pitch — swap to a passive buzzer for the true wail.
+// ==============================================================================
+
+/** Real ambulance hi-lo wail — sweeps between two pitches, ~0.85s per cycle. */
+void playAmbulanceSiren(int cycles) {
+  const int HI = 980;
+  const int LO = 620;
+  const int STEPS = 12;
+  const int STEP_MS = 35;
+
+  for (int c = 0; c < cycles; c++) {
+    for (int s = 0; s <= STEPS; s++) {
+      int freq = HI - ((HI - LO) * s / STEPS);
+      tone(BUZZER_PIN, freq);
+      digitalWrite(LED_RED, (s % 2 == 0) ? HIGH : LOW);
+      delay(STEP_MS);
+    }
+    for (int s = 0; s <= STEPS; s++) {
+      int freq = LO + ((HI - LO) * s / STEPS);
+      tone(BUZZER_PIN, freq);
+      digitalWrite(LED_RED, (s % 2 == 0) ? HIGH : LOW);
+      delay(STEP_MS);
+    }
+  }
+  noTone(BUZZER_PIN);
+  digitalWrite(LED_RED, LOW);
+}
+
+/** Donor match found — ~3 second cue: rising arpeggio, double confirm chime,
+ *  then a held resolving tone. */
+void playDonorFoundSound() {
+  int arpeggio[] = {523, 659, 784, 1047}; // C5 E5 G5 C6
+  for (int i = 0; i < 4; i++) {
+    tone(BUZZER_PIN, arpeggio[i], 150);
+    delay(90);
+  }
+  delay(150);
+
+  tone(BUZZER_PIN, 1047, 150); delay(130);
+  tone(BUZZER_PIN, 1319, 150); delay(280);
+  tone(BUZZER_PIN, 1047, 150); delay(130);
+  tone(BUZZER_PIN, 1319, 150); delay(300);
+
+  tone(BUZZER_PIN, 784, 1000); // ~1s sustained resolving tone
+  delay(1000);
+  noTone(BUZZER_PIN);
+}
+
+/** Happy acknowledge jingle — short upbeat run-up, distinct from the donor
+ *  found cue. */
+void playHappyAckSound() {
+  int melody[]    = {784, 1047, 1319, 1568}; // G5 C6 E6 G6
+  int durations[] = {130, 130, 130, 350};
+  for (int i = 0; i < 4; i++) {
+    tone(BUZZER_PIN, melody[i], durations[i]);
+    delay(durations[i] + 20);
+  }
+  noTone(BUZZER_PIN);
+}
+
 void connectWiFi() {
   Serial.printf("[WIFI] Connecting to %s...\n", WIFI_SSID);
   updateOLED("CONNECTING WIFI", WIFI_SSID);
@@ -131,14 +199,8 @@ void triggerEmergency() {
   serializeJson(doc, payload);
   sendHttpPost(EMERGENCY_ENDPOINT, payload);
 
-  for (int i = 0; i < 6; i++) {
-    digitalWrite(LED_RED, HIGH);
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(150);
-    digitalWrite(LED_RED, LOW);
-    digitalWrite(BUZZER_PIN, LOW);
-    delay(100);
-  }
+  // Real ambulance hi-lo siren — 4 full wail cycles (~3.4s)
+  playAmbulanceSiren(4);
 }
 
 void triggerDonorAvailable() {
@@ -158,8 +220,8 @@ void triggerDonorAvailable() {
   sendHttpPost("/api/v1/emergency/donor-available", payload);
 
   digitalWrite(LED_GREEN, HIGH);
-  digitalWrite(BUZZER_PIN, HIGH); delay(80); digitalWrite(BUZZER_PIN, LOW); delay(80);
-  digitalWrite(BUZZER_PIN, HIGH); delay(120); digitalWrite(BUZZER_PIN, LOW);
+  // ~3 second donor-found chime, matching the web dashboard
+  playDonorFoundSound();
 }
 
 void acknowledgeAlert() {
@@ -177,7 +239,8 @@ void acknowledgeAlert() {
   serializeJson(doc, payload);
   sendHttpPost("/api/v1/emergency/acknowledge", payload);
 
-  digitalWrite(BUZZER_PIN, HIGH); delay(50); digitalWrite(BUZZER_PIN, LOW);
+  // Happy resolution jingle, distinct from the donor-found chime
+  playHappyAckSound();
 }
 
 void setup() {
