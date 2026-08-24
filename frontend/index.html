@@ -6,40 +6,25 @@
   <title>Q-Transplant | Quantum-Powered Organ Transplant Network</title>
   <meta name="description" content="Q-Transplant uses quantum Grover's algorithm and ESP32 IoT hardware to match organ donors to recipients in seconds across 15+ hospitals in real time." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" />
-  <!-- Carbon Base Styles -->
   <link rel="stylesheet" href="/src/assets/carbon.css" />
-  <!-- Ultra Premium Extension -->
   <link rel="stylesheet" href="/src/assets/premium.css" />
-  <!-- Leaflet Map -->
+  <link rel="stylesheet" href="/src/assets/advanced.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <!-- Three.js 3D Engine CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- Manifest for PWA -->
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0f62fe" />
 </head>
 <body>
-  <!-- Global 3D Quantum Motion Particle Background -->
-  <canvas id="q-3d-background-canvas" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:0; opacity:0.65;"></canvas>
-
-  <div id="app" style="position:relative; z-index:1;"></div>
-  
-  <!-- Leaflet JS for Real-Time Cold Box GPS Map -->
+  <canvas id="q-3d-background-canvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;opacity:0.65;"></canvas>
+  <div id="app" style="position:relative;z-index:1;"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <!-- Application Script -->
   <script type="module" src="/src/app.js"></script>
+  <script type="module" src="/src/enhancements.js"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err));
-      });
-    }
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err)));
   </script>
 </body>
 </html>
-
