@@ -15,27 +15,13 @@ import { renderDashboardDonor } from './pages/DashboardDonor.js';
 import { renderDashboardPatient } from './pages/DashboardPatient.js';
 
 import { init3DBackground, attach3DTiltEffects, initEmbedded3DCanvas } from './services/three3d.js';
+import { initParticleSwarmBackground, stopParticleSwarmBackground } from './components/ParticleSwarmBackground.js';
 
 
 import { renderQuantumMatchView, attachQuantumMatchEvents } from './pages/QuantumMatchView.js';
 import { renderDonorSearchView, attachDonorSearchEvents } from './pages/DonorSearchView.js';
 import { renderTelemetryGauge } from './components/TelemetryGauge.js';
-import { renderAIPredictionView, attachAIPredictionEvents } from './pages/AIPredictionView.js';
-import { renderDigitalTwinView, attachDigitalTwinEvents } from './pages/DigitalTwinView.js';
-import {
-  renderBlockchainView, attachBlockchainEvents,
-  renderFederatedLearningView, attachFederatedLearningEvents,
-  renderMultiAgentView, attachMultiAgentEvents,
-  renderResearchAnalyticsView, attachResearchAnalyticsEvents,
-  renderSyntheticDataView, attachSyntheticDataEvents,
-  renderSlimeMouldBenchmarkView, attachSlimeMouldBenchmarkEvents
-} from './pages/AdvancedDashboards.js';
-
-
-import { renderNationalCommandCenterView, attachNationalCommandCenterEvents } from './pages/NationalCommandCenter.js';
-import { renderAICoordinatorView, attachAICoordinatorEvents } from './pages/AICoordinator.js';
 import { renderLiveTrackingView, attachLiveTrackingEvents } from './pages/LiveTrackingView.js';
-import { renderDocumentationView, attachDocumentationEvents } from './pages/DocumentationView.js';
 
 let wsConnection = null;
 
@@ -80,6 +66,7 @@ function renderApp() {
 
   // View routing: landing | portal-selector | portal-auth | dashboard
   if (state.view === 'landing') {
+    stopParticleSwarmBackground();
     root.innerHTML = renderLandingPage();
     attachLandingEvents((portalTarget) => {
       if (portalTarget) state.activePortal = portalTarget;
@@ -93,6 +80,7 @@ function renderApp() {
   }
 
   if (state.view === 'portal-selector') {
+    stopParticleSwarmBackground();
     root.innerHTML = renderPortalSelector();
     attachPortalSelectorEvents();
     init3DBackground();
@@ -101,6 +89,7 @@ function renderApp() {
   }
 
   if (state.view === 'portal-auth' && !state.currentUser) {
+    stopParticleSwarmBackground();
     root.innerHTML = renderAuthForm(state.activePortal || 'organizer');
     attachPortalAuthEvents();
     checkHashForResetToken();
@@ -121,23 +110,22 @@ function renderApp() {
 
   attachGlobalEvents();
 
+  // Donor and Hospital portals get a distinct particle-swarm background;
+  // Doctor and Organizer portals keep the existing look unchanged.
+  const role = state.currentUser?.role;
+  if (role === 'donor') {
+    initParticleSwarmBackground('donor');
+  } else if (role === 'hospital') {
+    initParticleSwarmBackground('hospital');
+  } else {
+    stopParticleSwarmBackground();
+  }
+
   if (state.activeTab === 'dashboard' || state.activeTab === 'telemetry') {
     initLiveMap(state.telemetry.lat, state.telemetry.lng);
   }
 
-  // Attach AI platform view event listeners based on activeTab
-  if (state.activeTab === 'gis-command') attachNationalCommandCenterEvents();
-  if (state.activeTab === 'ai-coordinator') attachAICoordinatorEvents();
   if (state.activeTab === 'live-tracking') attachLiveTrackingEvents();
-  if (state.activeTab === 'documentation') attachDocumentationEvents();
-  if (state.activeTab === 'ai-predict') attachAIPredictionEvents();
-  if (state.activeTab === 'digital-twin') attachDigitalTwinEvents();
-  if (state.activeTab === 'blockchain') attachBlockchainEvents();
-  if (state.activeTab === 'federated') attachFederatedLearningEvents();
-  if (state.activeTab === 'multi-agent') attachMultiAgentEvents();
-  if (state.activeTab === 'analytics') attachResearchAnalyticsEvents();
-  if (state.activeTab === 'slime-mould') attachSlimeMouldBenchmarkEvents();
-  if (state.activeTab === 'synthetic') attachSyntheticDataEvents();
   if (state.activeTab === 'matching') attachQuantumMatchEvents();
   if (state.activeTab === 'donor-search') attachDonorSearchEvents();
 
@@ -245,7 +233,7 @@ function renderActiveTab() {
         <div class="ultra-table-wrap">
           <table class="utbl">
             <thead>
-              <tr><th>Cold Box ID</th><th>Organ Type</th><th>Blood Group</th><th>HLA Markers</th><th>Max Ischemia</th><th>Status</th><th>Grover Match</th></tr>
+              <tr><th>Cold Box ID</th><th>Organ Type</th><th>Blood Group</th><th>HLA Markers</th><th>Max Ischemia</th><th>Status</th><th>Match</th></tr>
             </thead>
             <tbody>
               ${organs.map(o => `
@@ -258,7 +246,7 @@ function renderActiveTab() {
                   <td><span class="bx--tag bx--tag--green">${o.status.toUpperCase()}</span></td>
                   <td>
                     <button class="bx--btn bx--btn--primary btn-compute-quantum-match" data-id="${o.id}" style="padding:6px 12px; font-size:12px; border-radius:4px;">
-                      <i class="fa-solid fa-atom"></i> Run Grover Search
+                      <i class="fa-solid fa-atom"></i> Run Compatibility Match
                     </button>
                   </td>
                 </tr>
@@ -278,20 +266,7 @@ function renderActiveTab() {
     return renderDonorSearchView();
   }
 
-  if (tab === 'gis-command') return renderNationalCommandCenterView();
-  if (tab === 'ai-coordinator') return renderAICoordinatorView();
   if (tab === 'live-tracking') return renderLiveTrackingView();
-  if (tab === 'documentation') return renderDocumentationView();
-
-  if (tab === 'ai-predict') return renderAIPredictionView();
-  if (tab === 'digital-twin') return renderDigitalTwinView();
-  if (tab === 'blockchain') return renderBlockchainView();
-  if (tab === 'federated') return renderFederatedLearningView();
-  if (tab === 'multi-agent') return renderMultiAgentView();
-  if (tab === 'analytics') return renderResearchAnalyticsView();
-  if (tab === 'slime-mould') return renderSlimeMouldBenchmarkView();
-  if (tab === 'synthetic') return renderSyntheticDataView();
-
 
   if (tab === 'telemetry') {
     const telemetry = state.telemetry;
@@ -617,7 +592,7 @@ function attachGlobalEvents() {
           cold_box_id: `BOX-ESP32-${Math.floor(Math.random()*900 + 100)}`
         });
 
-        ToastManager.show(`Successfully registered pledged ${organType} (${bloodType}) into Quantum Database!`, 'success');
+        ToastManager.show(`Successfully registered pledged ${organType} (${bloodType}) into Registry!`, 'success');
         await loadSystemData();
       } catch (err) {
         ToastManager.show('Error registering organ: ' + err.message, 'error');
@@ -644,7 +619,7 @@ function attachGlobalEvents() {
           cold_box_id: `BOX-ESP32-${Math.floor(Math.random()*900 + 100)}`
         });
 
-        ToastManager.show(`Surgeon entry added: ${organType} (${bloodType}) is now live in Quantum Search!`, 'success');
+        ToastManager.show(`Surgeon entry added: ${organType} (${bloodType}) is now live in Compatibility Search!`, 'success');
         await loadSystemData();
       } catch (err) {
         ToastManager.show('Error adding organ: ' + err.message, 'error');
@@ -673,23 +648,22 @@ function attachGlobalEvents() {
         if (outputContainer) {
           outputContainer.innerHTML = `
             <div style="margin-top:1.5rem; padding:1.5rem; background:#000; border:1px solid #8a3ffc; border-radius:10px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#be95ff;">
-              <div>&gt; 🚨 BROADCASTING EMERGENCY ALERT TO 15 HOSPITALS...</div>
+              <div>&gt; 🚨 BROADCASTING EMERGENCY ALERT TO CONNECTED HOSPITALS...</div>
               <div>&gt; ESP32 Hardware Status: RED LED ON · BUZZER SOUNDING</div>
-              <div>&gt; Initializing Grover's Quantum Search algorithm...</div>
-              <div>&gt; Searching 1,247 registered donor profiles...</div>
+              <div>&gt; Searching registered donor profiles for compatibility...</div>
               <div class="quantum-wave-bar" style="margin:10px 0;"></div>
             </div>
           `;
         }
 
         const ev = await ApiService.postEmergencyAlert(payload);
-        ToastManager.show(`Emergency Alert Posted! Grover's Quantum Search Completed.`, 'success');
+        ToastManager.show(`Emergency Alert Posted! Compatibility Search Completed.`, 'success');
 
         setTimeout(() => {
           if (outputContainer) {
             outputContainer.innerHTML = `
               <div class="match-result-card">
-                <h4><i class="fa-solid fa-check-circle"></i> GROVER'S QUANTUM MATCH COMPLETED (O(√N) - 32 ITERATIONS)</h4>
+                <h4><i class="fa-solid fa-check-circle"></i> COMPATIBLE MATCH FOUND</h4>
                 <div class="match-result-hospital">
                   Matched Node: ${ev.matched_hospital || 'Apollo Specialty Hospital, Bengaluru'}
                 </div>
@@ -714,13 +688,13 @@ function attachGlobalEvents() {
     };
   }
 
-  // Quantum Match Trigger Button
+  // Compatibility Match Trigger Button
   document.querySelectorAll('.btn-compute-quantum-match').forEach(btn => {
     btn.onclick = async () => {
       const organId = parseInt(btn.getAttribute('data-id'));
       try {
         const matches = await ApiService.computeMatches(organId);
-        ToastManager.show(`Computed ${matches.length} Quantum Matches!`, 'success');
+        ToastManager.show(`Found ${matches.length} compatible matches`, 'success');
         await loadSystemData();
       } catch (err) {
         ToastManager.show('Error computing matches: ' + err.message, 'error');

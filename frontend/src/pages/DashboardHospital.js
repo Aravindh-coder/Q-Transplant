@@ -19,7 +19,7 @@ export function renderDashboardHospital() {
           <p class="dash-subtitle">Medical Center: <strong style="color:#f4f4f4;">${user.full_name}</strong> &nbsp;·&nbsp; ESP32 Hardware Node #HSP-001 <span style="color:#42be65; font-weight:700;">● Connected</span></p>
         </div>
         <button id="btn-run-grover-all" class="btn-hero-primary" style="font-size:13px; padding:10px 18px;">
-          <i class="fa-solid fa-atom"></i> Run Quantum Match All
+          <i class="fa-solid fa-atom"></i> Run Compatibility Match — All
         </button>
       </div>
 
@@ -38,10 +38,10 @@ export function renderDashboardHospital() {
         <div class="kpi-card green">
           <div class="kpi-card-label"><i class="fa-solid fa-boxes-packing" style="color:#42be65;"></i> Network Organs Available</div>
           <div class="kpi-card-value" style="color:#42be65;">${organs.length}</div>
-          <div class="kpi-card-sub">Validated in Quantum Network</div>
+          <div class="kpi-card-sub">Verified Matches</div>
         </div>
         <div class="kpi-card purple">
-          <div class="kpi-card-label"><i class="fa-solid fa-atom" style="color:#be95ff;"></i> Quantum Grover Matches</div>
+          <div class="kpi-card-label"><i class="fa-solid fa-atom" style="color:#be95ff;"></i> Compatible Matches</div>
           <div class="kpi-card-value" style="color:#be95ff;">${matches.length}</div>
           <div class="kpi-card-sub">Executed Allocations</div>
         </div>
@@ -59,7 +59,7 @@ export function renderDashboardHospital() {
             </h3>
           </div>
           <p style="font-size:12px; color:#c6c6c6; margin-bottom:1.5rem; line-height:1.6;">
-            Submitting triggers red LED alarms across all 15 connected hospital ESP32 cold box units while running Grover's Quantum Search across the national donor database.
+            Submitting triggers red LED alarms across all 15 connected hospital ESP32 cold box units while checking the national donor database for compatible matches.
           </p>
 
           <form id="form-emergency-request">
@@ -166,14 +166,14 @@ export function renderDashboardHospital() {
       <div class="ultra-table-wrap">
         <div class="ultra-table-header">
           <div class="ultra-table-title">
-            <i class="fa-solid fa-dna" style="color:#0f62fe;margin-right:8px;"></i> Registered Organ Donor Inventory — National Quantum Network
+            <i class="fa-solid fa-dna" style="color:#0f62fe;margin-right:8px;"></i> Registered Organ Donor Inventory — National Donor Registry
           </div>
           <span style="font-size:11px; color:#8d8d8d;">${organs.length} organs registered</span>
         </div>
         <table class="utbl">
           <thead>
             <tr>
-              <th>Cold Box ID</th><th>Organ Type</th><th>Blood Group</th><th>HLA Markers</th><th>Max Ischemia</th><th>Status</th><th style="text-align:right;">Quantum Action</th>
+              <th>Cold Box ID</th><th>Organ Type</th><th>Blood Group</th><th>HLA Markers</th><th>Max Ischemia</th><th>Status</th><th style="text-align:right;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -189,7 +189,7 @@ export function renderDashboardHospital() {
                 <td><span class="ticker-badge badge-matched">${o.status.toUpperCase()}</span></td>
                 <td style="text-align:right;">
                   <button class="btn-compute-quantum-match" data-id="${o.id}" class="btn-call" style="padding:5px 12px; font-size:11px; background:#0f62fe; color:#fff; border:none; border-radius:4px; cursor:pointer;">
-                    <i class="fa-solid fa-atom"></i> Run Grover Match
+                    <i class="fa-solid fa-atom"></i> Run Match
                   </button>
                 </td>
               </tr>

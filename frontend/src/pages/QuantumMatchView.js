@@ -1,7 +1,7 @@
 /**
- * Dedicated Quantum Match Engine Module for Q-Transplant
+ * Compatibility Matching Engine for Q-Transplant
  * Allows manual input entry OR batch JSON/CSV dataset file upload (Separate Patient & Donor datasets).
- * Parses uploaded files, applies Grover's-inspired quantum search O(sqrt(N)) and displays
+ * Parses uploaded files, scores ABO/HLA compatibility, and displays
  * ranked compatibility match results.
  */
 
@@ -10,8 +10,8 @@ export function renderQuantumMatchView() {
     <div>
       <div class="dash-header">
         <div>
-          <h1 class="dash-title"><i class="fa-solid fa-atom" style="color:#8a3ffc;margin-right:8px;"></i>Grover's Quantum Match Engine Execution</h1>
-          <p class="dash-subtitle">Real-Time $O(\\sqrt{N})$ Quantum Search for Large Donor &amp; Patient Pools</p>
+          <h1 class="dash-title"><i class="fa-solid fa-atom" style="color:#8a3ffc;margin-right:8px;"></i>Compatibility Matching Engine</h1>
+          <p class="dash-subtitle">Real-Time ABO & HLA Compatibility Search Across Donor & Patient Pools</p>
         </div>
       </div>
 
@@ -29,7 +29,7 @@ export function renderQuantumMatchView() {
         <!-- Manual Input Form -->
         <div id="qm-manual-section">
           <p style="font-size:13px; color:#8d8d8d; margin-bottom: 1.25rem;">
-            Enter donor organ parameters and patient recipient requirements to execute Grover's quantum amplitude amplification search.
+            Enter donor organ parameters and patient recipient requirements to run the compatibility search.
           </p>
           <form id="form-qm-manual">
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
@@ -101,7 +101,7 @@ export function renderQuantumMatchView() {
             </div>
 
             <button type="submit" class="btn-hero-primary" style="width:100%; justify-content:center; margin-top:1.5rem; padding:16px;">
-              <i class="fa-solid fa-atom"></i> EXECUTE GROVER'S QUANTUM MATCH ENGINE
+              <i class="fa-solid fa-atom"></i> RUN COMPATIBILITY MATCH ENGINE
             </button>
           </form>
         </div>
@@ -109,7 +109,7 @@ export function renderQuantumMatchView() {
         <!-- File Upload Section (2 Separate Files: Patient Dataset & Donor Dataset) -->
         <div id="qm-file-section" style="display:none;">
           <p style="font-size:13px; color:#8d8d8d; margin-bottom: 1.25rem;">
-            Upload separate <strong style="color:#be95ff;">Patient</strong> and <strong style="color:#78a9ff;">Donor</strong> dataset files (JSON or CSV) to perform Grover's quantum search matching across large populations.
+            Upload separate <strong style="color:#be95ff;">Patient</strong> and <strong style="color:#78a9ff;">Donor</strong> dataset files (JSON or CSV) to match across large populations.
           </p>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; margin-bottom: 1.5rem;">
@@ -159,16 +159,16 @@ export function renderQuantumMatchView() {
           </div>
 
           <div id="dataset-summary-box" style="background:#0f0f0f; border:1px solid #8a3ffc; border-radius:8px; padding:1rem; margin-bottom:1.25rem; font-size:12px; color:#c6c6c6; display:none;">
-            📊 <strong>Quantum Search Pool:</strong> <span id="summary-patient-count" style="color:#be95ff;">0 Patients</span> × <span id="summary-donor-count" style="color:#78a9ff;">0 Donors</span> = <strong id="summary-total-combos" style="color:#f1c21b;">0 Total Pair Combinations</strong>
+            📊 <strong>Compatibility Search Pool:</strong> <span id="summary-patient-count" style="color:#be95ff;">0 Patients</span> × <span id="summary-donor-count" style="color:#78a9ff;">0 Donors</span> = <strong id="summary-total-combos" style="color:#f1c21b;">0 Total Pair Combinations</strong>
           </div>
 
           <button type="button" id="btn-execute-file-qm" class="btn-hero-primary" style="width:100%; justify-content:center; padding:16px;">
-            <i class="fa-solid fa-atom"></i> ANALYSE &amp; RUN GROVER SEARCH MATCHING ACROSS DATASETS
+            <i class="fa-solid fa-atom"></i> ANALYSE & MATCH ACROSS DATASETS
           </button>
         </div>
       </div>
 
-      <!-- Quantum Output Terminal -->
+      <!-- Match Output Terminal -->
       <div id="qm-output-terminal" style="display:none;"></div>
     </div>
   `;
@@ -273,7 +273,7 @@ function computeCompatibility(donor, patient) {
   return { score: parseFloat(score.toFixed(2)), hla };
 }
 
-// ─── Grover's Quantum Search Simulation ──────────────────────────────────────
+// ─── Grover's Compatibility Search Simulation ──────────────────────────────────────
 // Real Grover's would run on a QPU; here we simulate the correct iteration count
 // and apply it as an ordering/amplification weight to the top-k matches.
 function groverSearch(patients, donors) {
@@ -476,38 +476,32 @@ function runGroverWithData(donors, patients, mode) {
   terminal.scrollIntoView({ behavior: 'smooth' });
 
   const N = donors.length * patients.length;
-  const groverIterations = Math.max(1, Math.floor((Math.PI / 4) * Math.sqrt(N)));
-  const speedup = (N / groverIterations).toFixed(1);
+  const totalSteps = Math.max(1, Math.min(N, 24));
 
   terminal.innerHTML = `
-    <div style="padding:1.5rem; background:#000; border:1px solid #8a3ffc; border-radius:12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#be95ff; box-shadow:0 0 30px rgba(138,63,252,0.25);">
-      <div>&gt; ⚛️  INITIALIZING GROVER'S QUANTUM SEARCH ENGINE v2.0...</div>
-      <div>&gt; 📊 Dataset loaded: <span style="color:#78a9ff;">${patients.length.toLocaleString()} patients</span> × <span style="color:#42be65;">${donors.length.toLocaleString()} donors</span></div>
-      <div>&gt; 🔬 Search Space N: <strong style="color:#f1c21b;">${N.toLocaleString()} pair combinations</strong></div>
-      <div>&gt; ⚡ Classical search would require <strong>${N.toLocaleString()}</strong> comparisons</div>
-      <div>&gt; ⚛️  Grover's Oracle Superposition: |Ψ⟩ = 1/√N ∑ |x_patient, y_donor⟩</div>
-      <div>&gt; 🔄 Optimal Grover Iterations: N_iter = ⌊π/4 × √${N}⌋ = <strong style="color:#42be65;">${groverIterations.toLocaleString()} iterations</strong></div>
-      <div>&gt; 📈 Quantum Speedup Factor: <strong style="color:#ff7eb6;">${speedup}×</strong> faster than classical search</div>
+    <div style="padding:1.5rem; background:#000; border:1px solid #393939; border-radius:12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#c6c6c6;">
+      <div>&gt; Starting compatibility scan...</div>
+      <div>&gt; Dataset loaded: <span style="color:#78a9ff;">${patients.length.toLocaleString()} patients</span> × <span style="color:#42be65;">${donors.length.toLocaleString()} donors</span></div>
+      <div>&gt; Checking ABO blood group, HLA antigen similarity, and urgency ranking across <strong style="color:#f1c21b;">${N.toLocaleString()} candidate pairs</strong></div>
       <div class="quantum-wave-bar" style="margin:12px 0;"></div>
-      <div id="qm-progress-log">&gt; Amplifying probability amplitudes... [0/${groverIterations.toLocaleString()}]</div>
+      <div id="qm-progress-log">&gt; Scoring pairs... [0/${totalSteps.toLocaleString()}]</div>
     </div>
   `;
 
   // Animate progress then run actual matching
   let iter = 0;
-  const step = Math.max(1, Math.floor(groverIterations / 8));
+  const step = Math.max(1, Math.floor(totalSteps / 8));
   const interval = setInterval(() => {
-    iter = Math.min(iter + step, groverIterations);
+    iter = Math.min(iter + step, totalSteps);
     const logEl = document.getElementById('qm-progress-log');
-    const prob = (0.5 + (iter / groverIterations) * 0.499).toFixed(4);
     if (logEl) {
-      logEl.innerHTML = `&gt; Amplifying probability amplitudes... [${iter.toLocaleString()}/${groverIterations.toLocaleString()}] — P(Target) = ${prob}`;
+      logEl.innerHTML = `&gt; Scoring pairs... [${iter.toLocaleString()}/${totalSteps.toLocaleString()}]`;
     }
-    if (iter >= groverIterations) {
+    if (iter >= totalSteps) {
       clearInterval(interval);
       setTimeout(() => {
         const result = groverSearch(patients, donors);
-        renderMatchResultTable(terminal, result, { patients, donors, mode, groverIterations, speedup, N });
+        renderMatchResultTable(terminal, result, { patients, donors, mode, N });
       }, 300);
     }
   }, 80);
@@ -515,8 +509,8 @@ function runGroverWithData(donors, patients, mode) {
 
 // ─── Render detailed match results table ──────────────────────────────────────
 function renderMatchResultTable(container, result, meta) {
-  const { pairs, total, N, groverIterations } = result;
-  const { patients, donors, mode, speedup } = meta;
+  const { pairs, total, N } = result;
+  const { patients, donors, mode } = meta;
 
   const rowsHTML = pairs.length === 0
     ? `<tr><td colspan="7" style="text-align:center; color:#8d8d8d; padding:2rem;">No compatible matches found. Check blood type / organ type compatibility in your datasets.</td></tr>`
@@ -536,33 +530,29 @@ function renderMatchResultTable(container, result, meta) {
 
   container.innerHTML = `
     <!-- Stats bar -->
-    <div class="kpi-grid" style="grid-template-columns: repeat(5, 1fr); margin-bottom:1.5rem; margin-top:1rem;">
+    <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:1.5rem; margin-top:1rem;">
       <div class="kpi-card blue" style="padding:1rem;">
-        <div class="kpi-card-label">Search Space (N)</div>
+        <div class="kpi-card-label">Candidate Pairs Scanned</div>
         <div class="kpi-card-value" style="font-size:1.2rem;">${N.toLocaleString()}</div>
-      </div>
-      <div class="kpi-card green" style="padding:1rem;">
-        <div class="kpi-card-label">Grover Iterations</div>
-        <div class="kpi-card-value" style="font-size:1.2rem;">${groverIterations.toLocaleString()}</div>
       </div>
       <div class="kpi-card purple" style="padding:1rem;">
         <div class="kpi-card-label">Compatible Pairs</div>
         <div class="kpi-card-value" style="font-size:1.2rem;">${total.toLocaleString()}</div>
       </div>
-      <div class="kpi-card yellow" style="padding:1rem;">
-        <div class="kpi-card-label">Quantum Speedup</div>
-        <div class="kpi-card-value" style="font-size:1.2rem;">${speedup}×</div>
-      </div>
       <div class="kpi-card" style="padding:1rem; background:rgba(66,190,101,0.1); border-color:#42be65;">
         <div class="kpi-card-label">Top Match Score</div>
         <div class="kpi-card-value" style="font-size:1.2rem; color:#42be65;">${pairs.length > 0 ? pairs[0].score.toFixed(1) + '%' : 'N/A'}</div>
+      </div>
+      <div class="kpi-card yellow" style="padding:1rem;">
+        <div class="kpi-card-label">Mode</div>
+        <div class="kpi-card-value" style="font-size:1rem;">${mode === 'file' ? 'Dataset Upload' : 'Manual Input'}</div>
       </div>
     </div>
 
     <!-- Match Result Header -->
     <div class="match-result-card" style="margin-top:0; padding:1.25rem;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h4 style="font-size:15px; margin:0; color:#42be65;"><i class="fa-solid fa-circle-check"></i> GROVER'S QUANTUM SEARCH COMPLETED — TOP ${pairs.length} MATCHES RANKED</h4>
+        <h4 style="font-size:15px; margin:0; color:#42be65;"><i class="fa-solid fa-circle-check"></i> COMPATIBILITY SCAN COMPLETE — TOP ${pairs.length} MATCHES RANKED</h4>
         <span class="bx--tag bx--tag--green" style="font-size:11px; padding:4px 10px;">
           ${pairs.length}/${total} shown · Mode: ${mode === 'file' ? 'Dataset Upload' : 'Manual Input'}
         </span>
@@ -593,7 +583,6 @@ function renderMatchResultTable(container, result, meta) {
         <button onclick="window.print()" class="btn-call" style="background:rgba(138,63,252,0.2); border-color:#8a3ffc; color:#be95ff;">
           <i class="fa-solid fa-print"></i> EXPORT MATCH REPORT
         </button>
-        <span style="font-size:11px; color:#42be65;">✓ Grover's O(√N) algorithm achieved ${speedup}× speedup over classical O(N) search.</span>
         <span style="font-size:11px; color:#6f6f6f;">Match log saved to organizer audit trail.</span>
       </div>
     </div>
