@@ -1,57 +1,47 @@
-import os
-from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Q-Transplant Enterprise Platform"
-    VERSION: str = "1.0.0"
+    VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
 
     # Environment & Database
-    ENV: str = os.getenv("ENV", "development")
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", "sqlite:///./qtransplant.db"
-    )
+    ENV: str = "development"
+    DATABASE_URL: str = "sqlite:///./qtransplant.db"
+    REDIS_URL: str = "redis://localhost:6379/0"
 
-    # JWT Security
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "super-secret-transplant-key-change-in-production-32-bytes-min!")
+    # Security: never commit real secrets. Production must provide JWT_SECRET.
+    JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours for dev convenience
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Rate Limiting
+    # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 120
 
-    # Email / SMTP Settings & Admin Destination
-    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "aravindhjoshua10@gmail.com")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "zqlgbhkftzzdjcgd")
-    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "aravindhjoshua10@gmail.com")
+    # Email / SMTP
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
     SMTP_TLS: bool = True
-    ORGANIZER_EMAIL: str = os.getenv("ORGANIZER_EMAIL", "aravindhjoshua10@gmail.com")
+    ORGANIZER_EMAIL: str = ""
 
-    # CORS Configuration
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:8080",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:8080",
-        "http://localhost:8000"
-    ]
+    # CORS: comma-separated URLs in the environment.
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174"
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
     )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 
 settings = Settings()
