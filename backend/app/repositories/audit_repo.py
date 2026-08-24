@@ -44,3 +44,29 @@ class AuditRepository:
 
     def get_user_notifications(self, user_id: int) -> List[Notification]:
         return self.db.query(Notification).filter(Notification.user_id == user_id).order_by(Notification.created_at.desc()).all()
+
+    def get_unread_count(self, user_id: int) -> int:
+        return self.db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        ).count()
+
+    def mark_as_read(self, user_id: int, notification_id: int) -> Optional[Notification]:
+        notif = self.db.query(Notification).filter(
+            Notification.id == notification_id,
+            Notification.user_id == user_id
+        ).first()
+        if notif is None:
+            return None
+        notif.is_read = True
+        self.db.commit()
+        self.db.refresh(notif)
+        return notif
+
+    def mark_all_as_read(self, user_id: int) -> int:
+        updated = self.db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        ).update({Notification.is_read: True})
+        self.db.commit()
+        return updated

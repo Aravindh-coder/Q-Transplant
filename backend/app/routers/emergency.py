@@ -5,11 +5,43 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from backend.app.core.database import get_db, Base
+from backend.app.core.database import get_db, Base, SessionLocal
 from backend.app.core.security import RoleChecker
+from backend.app.core.websockets import ws_manager
+from backend.app.core.logging import logger
+from backend.app.models.domain import User, UserRole
+from backend.app.repositories.audit_repo import AuditRepository
 
 router = APIRouter(prefix="/emergency", tags=["Emergency & Quantum Match Pipeline"])
+
+
+async def _notify_all_hospitals(db: Session, title: str, message: str, notification_type: str = "emergency"):
+    """Creates a DB notification for every hospital-role user and broadcasts
+    it live over WebSocket so connected dashboards update instantly."""
+    repo = AuditRepository(db)
+    hospital_users = db.query(User).filter(User.role == UserRole.HOSPITAL.value).all()
+    for u in hospital_users:
+        repo.create_notification(u.id, title, message, notification_type)
+    try:
+        await ws_manager.broadcast({
+            "type": "notification",
+            "notification_type": notification_type,
+            "title": title,
+            "message": message,
+        })
+    except Exception as e:
+        logger.error(f"WebSocket broadcast failed: {e}")
+
+
+async def _broadcast_state(event_type: str):
+    """Push the current emergency state to every connected WebSocket client
+    so dashboards react in real time without polling."""
+    try:
+        await ws_manager.broadcast({"type": event_type, "state": _current_state})
+    except Exception as e:
+        logger.error(f"WebSocket broadcast failed: {e}")
 
 # ── Known hospital directory (name → geo + contact + avatar) ──────────────────
 # Used to resolve real coordinates + a hospital "photo" (initials avatar) for
@@ -32,7 +64,6 @@ def _hospital_geo(name: str) -> dict:
     key = (name or "").strip().lower()
     if key in HOSPITAL_DIRECTORY:
         return HOSPITAL_DIRECTORY[key]
-    # Fuzzy contains-match (e.g. "Fortis Healthcare, Richmond Road")
     for k, v in HOSPITAL_DIRECTORY.items():
         if k.split(",")[0].split()[0] in key:
             return v
@@ -126,7 +157,7 @@ def get_current_state():
 
 # ── POST: Emergency SOS Button (ESP32 GPIO 13) ────────────────────────────────
 @router.post("/dispatch", status_code=status.HTTP_201_CREATED)
-def hardware_emergency_dispatch(payload: dict):
+async def hardware_emergency_dispatch(payload: dict, db: Session = Depends(get_db)):
     """ESP32 GPIO 13 pressed — set system state to SEARCHING emergency."""
     now = datetime.now(timezone.utc).isoformat()
     hosp_name = payload.get("hospital_name", "Apollo Specialty Hospital")
@@ -161,12 +192,20 @@ def hardware_emergency_dispatch(payload: dict):
     # Save to history log
     _emergency_events.insert(0, {**_current_state, "id": len(_emergency_events) + 1, "created_at": now})
 
+    await _notify_all_hospitals(
+        db,
+        title="🚨 Emergency Organ Request",
+        message=f"{hosp_name} needs {_current_state['organ_needed']} ({_current_state['blood_type']}) — urgency {_current_state['urgency_level']}.",
+        notification_type="emergency"
+    )
+    await _broadcast_state("EMERGENCY_DISPATCHED")
+
     return {"status": "EMERGENCY_DISPATCHED", "state": _current_state}
 
 
 # ── POST: Manual Emergency Form (landing page button) ─────────────────────────
 @router.post("/", response_model=EmergencyOut, status_code=status.HTTP_201_CREATED)
-def post_emergency_alert(payload: EmergencyRequest):
+async def post_emergency_alert(payload: EmergencyRequest, db: Session = Depends(get_db)):
     """Manual emergency submission from landing page form."""
     now = datetime.now(timezone.utc).isoformat()
     geo = _hospital_geo(payload.hospital_name)
@@ -214,12 +253,21 @@ def post_emergency_alert(payload: EmergencyRequest):
         "matched_hospital": None,
     }
     _emergency_events.insert(0, event)
+
+    await _notify_all_hospitals(
+        db,
+        title="🚨 Emergency Organ Request",
+        message=f"{payload.hospital_name} needs {payload.organ_needed} ({payload.blood_type}) — urgency {payload.urgency_level}.",
+        notification_type="emergency"
+    )
+    await _broadcast_state("EMERGENCY_DISPATCHED")
+
     return event
 
 
 # ── POST: Donor Available Button (ESP32 GPIO 12) ──────────────────────────────
 @router.post("/donor-available")
-def register_donor_available(payload: dict):
+async def register_donor_available(payload: dict, db: Session = Depends(get_db)):
     """ESP32 GPIO 12 pressed — another hospital has a donor organ ready."""
     donor_hospital = payload.get("hospital_name", "Fortis Healthcare, Bengaluru")
     organ_type = payload.get("organ_type", "Heart")
@@ -228,13 +276,11 @@ def register_donor_available(payload: dict):
 
     donor_geo = _hospital_geo(donor_hospital)
 
-    # Distance + ETA from the donor hospital to the hospital that raised the emergency
     req_lat = _current_state.get("hospital_lat") or DEFAULT_HOSPITAL_GEO["lat"]
     req_lng = _current_state.get("hospital_lng") or DEFAULT_HOSPITAL_GEO["lng"]
     distance_km = round(_haversine_km(req_lat, req_lng, donor_geo["lat"], donor_geo["lng"]), 1)
     if distance_km < 0.5:
-        distance_km = round(random.uniform(3.0, 9.0), 1)  # avoid a 0km same-city coincidence looking odd
-    # Green-corridor ambulance average speed ~50 km/h in urban traffic-cleared lanes
+        distance_km = round(random.uniform(3.0, 9.0), 1)
     eta_minutes = round((distance_km / 50.0) * 60.0, 1)
 
     _current_state.update({
@@ -251,6 +297,14 @@ def register_donor_available(payload: dict):
         "message": f"💚 DONOR MATCH FOUND — {donor_hospital} has {organ_type} ({blood_type}) available. Transport team dispatched!",
     })
 
+    await _notify_all_hospitals(
+        db,
+        title="💚 Donor Match Found",
+        message=f"{donor_hospital} has {organ_type} ({blood_type}) available — ETA {eta_minutes} min.",
+        notification_type="donor_match"
+    )
+    await _broadcast_state("DONOR_MATCHED")
+
     return {
         "status": "DONOR_MATCHED",
         "donor_hospital": donor_hospital,
@@ -265,7 +319,7 @@ def register_donor_available(payload: dict):
 
 # ── POST: Acknowledge Button (ESP32 GPIO 14) ──────────────────────────────────
 @router.post("/acknowledge")
-def acknowledge_emergency(payload: Optional[dict] = None):
+async def acknowledge_emergency(payload: Optional[dict] = None, db: Session = Depends(get_db)):
     """ESP32 GPIO 14 pressed — hospital crew acknowledges, emergency stops."""
     now = datetime.now(timezone.utc).isoformat()
 
@@ -274,6 +328,8 @@ def acknowledge_emergency(payload: Optional[dict] = None):
         "updated_at": now,
         "message": "✔ ACKNOWLEDGED — Emergency siren stopped. Hospital crew confirmed. System returning to normal.",
     })
+
+    await _broadcast_state("ACKNOWLEDGED")
 
     return {
         "status": "ACKNOWLEDGED",
