@@ -79,6 +79,90 @@ app.include_router(coordinator.router, prefix=settings.API_V1_STR)
 app.include_router(donor_search.router, prefix=settings.API_V1_STR)
 
 
+EXTRA_HOSPITALS = [
+    {"name": "Fortis Healthcare, Bengaluru", "email": "fortis@qtransplant.org", "city": "Bengaluru", "state": "Karnataka",
+     "address": "Bannerghatta Rd, Richmond Town, 560025", "lat": 12.8924, "lng": 77.5975, "phone": "080-6621-4444",
+     "license": "LIC-KA-2026-9042", "beds": 18, "occupied": 10, "vents": 5},
+    {"name": "Manipal Hospital", "email": "manipal@qtransplant.org", "city": "Bengaluru", "state": "Karnataka",
+     "address": "Old Airport Rd, HAL, 560017", "lat": 12.9581, "lng": 77.6482, "phone": "080-2502-4444",
+     "license": "LIC-KA-2026-9043", "beds": 22, "occupied": 15, "vents": 7},
+    {"name": "Narayana Health City", "email": "narayana@qtransplant.org", "city": "Bengaluru", "state": "Karnataka",
+     "address": "Bommasandra, Hosur Rd, 560099", "lat": 12.8103, "lng": 77.6920, "phone": "080-7122-2222",
+     "license": "LIC-KA-2026-9044", "beds": 25, "occupied": 12, "vents": 8},
+    {"name": "AIIMS Delhi", "email": "aiims-delhi@qtransplant.org", "city": "Delhi", "state": "Delhi",
+     "address": "Ansari Nagar, New Delhi, 110029", "lat": 28.5672, "lng": 77.2100, "phone": "011-2658-8500",
+     "license": "LIC-DL-2026-9045", "beds": 30, "occupied": 20, "vents": 10},
+    {"name": "CMC Vellore", "email": "cmc-vellore@qtransplant.org", "city": "Vellore", "state": "Tamil Nadu",
+     "address": "Ida Scudder Rd, Vellore, 632004", "lat": 12.9260, "lng": 79.1350, "phone": "0416-228-1000",
+     "license": "LIC-TN-2026-9046", "beds": 20, "occupied": 9, "vents": 6},
+    {"name": "Apollo Hospitals, Chennai", "email": "apollo-chennai@qtransplant.org", "city": "Chennai", "state": "Tamil Nadu",
+     "address": "Greams Rd, Thousand Lights, 600006", "lat": 13.0604, "lng": 80.2496, "phone": "044-2829-3333",
+     "license": "LIC-TN-2026-9047", "beds": 24, "occupied": 16, "vents": 9},
+    {"name": "Max Super Speciality Hospital", "email": "max-delhi@qtransplant.org", "city": "Delhi", "state": "Delhi",
+     "address": "Press Enclave Rd, Saket, 110017", "lat": 28.5286, "lng": 77.2124, "phone": "011-2651-5050",
+     "license": "LIC-DL-2026-9048", "beds": 16, "occupied": 11, "vents": 4},
+]
+
+
+def seed_additional_hospitals():
+    """Ensures the wider hospital network (beyond the single default Apollo
+    Bengaluru record) exists in the DB — runs every startup and only inserts
+    hospitals that aren't already present by name, so it's safe on an
+    existing/live database and never duplicates rows."""
+    db = SessionLocal()
+    try:
+        for h in EXTRA_HOSPITALS:
+            existing = db.query(Hospital).filter(Hospital.name == h["name"]).first()
+            if existing:
+                continue
+
+            hosp_user = db.query(User).filter(User.email == h["email"]).first()
+            if not hosp_user:
+                hosp_user = User(
+                    email=h["email"],
+                    password_hash=get_password_hash("HospitalPass123!"),
+                    full_name=h["name"],
+                    role=UserRole.HOSPITAL.value,
+                    phone=h["phone"],
+                    is_active=True,
+                    is_approved=True
+                )
+                db.add(hosp_user)
+                db.commit()
+                db.refresh(hosp_user)
+
+            hosp_profile = Hospital(
+                user_id=hosp_user.id,
+                name=h["name"],
+                license_number=h["license"],
+                city=h["city"],
+                state=h["state"],
+                address=h["address"],
+                lat=h["lat"],
+                lng=h["lng"],
+                contact_phone=h["phone"]
+            )
+            db.add(hosp_profile)
+            db.commit()
+            db.refresh(hosp_profile)
+
+            db.add(ICUOccupancy(
+                hospital_id=hosp_profile.id,
+                total_beds=h["beds"],
+                occupied_beds=h["occupied"],
+                ventilators_available=h["vents"]
+            ))
+            for bt in ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]:
+                db.add(BloodInventory(hospital_id=hosp_profile.id, blood_type=bt, units_available=8))
+            db.commit()
+            logger.info(f"Seeded additional hospital: {h['name']}")
+    except Exception as e:
+        logger.error(f"Error seeding additional hospitals: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def seed_initial_data():
     """Seeds initial administrative organizer and sample operational data if missing."""
@@ -239,6 +323,8 @@ def seed_initial_data():
         db.rollback()
     finally:
         db.close()
+
+    seed_additional_hospitals()
 
 
 @app.get("/health", tags=["System Health"])
