@@ -6,3 +6,4 @@ pyjwt
 python-dotenv
 websockets
 pydantic[email]
+python-multipart
