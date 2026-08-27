@@ -37,7 +37,7 @@ def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
     if body.role=="doctor" and (not body.phone or not body.address or not body.license_number or not body.specialty or not body.professional_information): raise HTTPException(400,"Doctor registration requires phone, address, license_number, specialty and professional_information. Profile photo and medical certificate must be uploaded before approval.")
     if body.role=="hospital" and (not body.hospital_name or not body.hospital_code or not body.phone or not body.address or not body.location or not body.registration_number or not body.authorized_contact): raise HTTPException(400,"Hospital registration requires all institutional fields.")
     status="unverified" if body.role=="donor" else "pending"
-    user=User(email=body.email,password_hash if False else hash_password(body.password),role=body.role,full_name=body.full_name,status=status,email_verified=False)
+    user=User(email=body.email,hashed_password=hash_password(body.password),role=body.role,full_name=body.full_name,status=status,email_verified=False)
     db.add(user); db.commit(); db.refresh(user)
     if body.role=="doctor": db.add(DoctorProfile(user_id=user.id,license_number=body.license_number,phone=body.phone,address=body.address,specialty=body.specialty,professional_information=body.professional_information,hospital_id=body.hospital_id,approval_status="PENDING_APPROVAL"))
     elif body.role=="hospital": db.add(HospitalProfile(user_id=user.id,hospital_name=body.hospital_name,hospital_code=body.hospital_code,phone=body.phone,address=body.address,location=body.location,registration_number=body.registration_number,authorized_contact=body.authorized_contact,verification_status="pending"))
