@@ -20,19 +20,19 @@ def main():
     backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "backend", "backend"))
     venv_uvicorn = os.path.abspath(os.path.join(os.path.dirname(__file__), "venv", "bin", "uvicorn"))
     
-    backend_cmd = [venv_uvicorn, "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    backend_cmd = [venv_uvicorn, "app.main:app", "--host", "0.0.0.0", "--port", "9900", "--reload"]
     backend_proc = subprocess.Popen(backend_cmd, cwd=backend_path)
 
     # 3. Start Frontend HTTP Server
-    print("\n[3/3] Starting Frontend HTTP Server on http://localhost:5173 ...")
-    frontend_cmd = ["./venv/bin/python3", "-m", "http.server", "5173"]
+    print("\n[3/3] Starting Frontend HTTP Server on http://localhost:7788 ...")
+    frontend_cmd = ["./venv/bin/python3", "-m", "http.server", "7788"]
     frontend_proc = subprocess.Popen(frontend_cmd)
 
     print("\n" + "=" * 60)
     print("🚀 Q-TRANSPLANT IS LIVE!")
-    print("Landing Page: http://localhost:5173/index.html")
-    print("Application:  http://localhost:5173/app.html")
-    print("FastAPI Docs: http://localhost:8000/docs")
+    print("Landing Page: http://localhost:7788/index.html")
+    print("Application:  http://localhost:7788/app.html")
+    print("FastAPI Docs: http://localhost:9900/docs")
     print("=" * 60)
 
     try:
