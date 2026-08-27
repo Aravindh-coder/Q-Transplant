@@ -145,8 +145,9 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 .toast-stack{position:fixed; bottom:24px; right:24px; z-index:500; display:flex; flex-direction:column; gap:10px;}
 .toast{background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--cyan); padding:14px 20px; border-radius:8px; font-size:.84rem; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,.5);}
 </style>
-</head>
 <body>
+
+<img id="organizerBgImage" src="organizer_bg.png" alt="Organizer Background" style="position:fixed; inset:0; width:100vw; height:100vh; object-fit:cover; z-index:0; display:none; pointer-events:none; filter:brightness(1.15) contrast(1.08);">
 
 <div class="top-header">
   <a href="index.html" class="brandmark">
@@ -175,7 +176,7 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
           <div class="field">
             <label>Select Authorization Role</label>
             <select id="loginRoleSelect" onchange="updateLoginFields()">
-              <option value="organizer">Organizer Admin (aravindhjoshua10@gmail.com)</option>
+              <option value="organizer">Organizer Admin</option>
               <option value="doctor">Approved Doctor</option>
               <option value="donor">Registered Donor</option>
               <option value="hospital">Hospital Authority</option>
@@ -183,7 +184,7 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
           </div>
           <div class="field">
             <label>Email Address</label>
-            <input type="email" id="loginEmail" value="aravindhjoshua10@gmail.com" required>
+            <input type="email" id="loginEmail" placeholder="admin@qtransplant.org" required>
           </div>
           <div class="field">
             <label>Password</label>
@@ -312,6 +313,13 @@ function handleRoute() {
   document.getElementById("currentRouteDisplay").innerText = config.title;
   document.querySelectorAll(".route-view").forEach(v => v.classList.remove("active"));
 
+  const bgImg = document.getElementById("organizerBgImage");
+  if (config.role === "organizer") {
+    bgImg.style.display = "block";
+  } else {
+    bgImg.style.display = "none";
+  }
+
   if (config.view === "dashboard") {
     document.getElementById("route-dashboard").classList.add("active");
     renderDashboard(config.role, config.pane, hash);
@@ -342,13 +350,13 @@ function updateLoginFields() {
   const role = document.getElementById("loginRoleSelect").value;
   const emailInput = document.getElementById("loginEmail");
   if (role === "organizer") {
-    emailInput.value = "aravindhjoshua10@gmail.com";
+    emailInput.value = "admin@qtransplant.org";
   } else if (role === "doctor") {
-    emailInput.value = "dr.aravindh@qtransplant.org";
+    emailInput.value = "doctor@qtransplant.org";
   } else if (role === "donor") {
-    emailInput.value = "priya@qdonor.org";
+    emailInput.value = "donor@qtransplant.org";
   } else {
-    emailInput.value = "apollo@qtransplant.org";
+    emailInput.value = "hospital@qtransplant.org";
   }
 }
 
