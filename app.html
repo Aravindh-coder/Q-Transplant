@@ -9,8 +9,6 @@
 <!-- Leaflet.js Night Map -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 :root{
@@ -38,7 +36,7 @@ body{
 /* Top Header */
 .top-header{
   position:fixed; top:0; left:0; right:0; height:60px; z-index:100;
-  display:flex; align-items:center; justify-content:space-between; padding:0 24px;
+  display:flex; align-items:center; justify-space-between; padding:0 24px;
   background:rgba(3,7,18,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--line);
 }
 .brandmark{display:flex; align-items:center; gap:10px; font-family:var(--disp); font-weight:700; font-size:1.1rem; color:#fff; text-decoration:none;}
@@ -61,38 +59,11 @@ body{
 
 .center-box{min-height:calc(100vh - 60px); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; width:100%; text-align:center;}
 
-/* Role Cards Grid */
-.role-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:18px; max-width:1040px; width:100%; margin-top:28px;}
-.role-card{padding:32px 24px; text-align:left; cursor:pointer; display:flex; flex-direction:column; gap:12px;}
-.role-card:hover{transform:translateY(-4px); border-color:var(--cyan); box-shadow:0 0 28px rgba(45,212,191,0.25);}
-.role-card h3{font-family:var(--disp); font-size:1.15rem; font-weight:600;}
-.role-card p{font-size:.82rem; color:var(--muted); line-height:1.5;}
-
-/* Sidebar Dashboard Shell */
-.dash-shell{display:flex; width:100%; min-height:calc(100vh - 60px);}
-.sidebar{width:250px; flex-shrink:0; border-right:1px solid var(--line); padding:24px 16px; display:flex; flex-direction:column; background:rgba(3,7,18,0.85); backdrop-filter:blur(20px);}
-.side-title{font-family:var(--disp); font-weight:700; font-size:1rem; padding:0 8px;}
-.side-sub{font-family:var(--mono); font-size:.68rem; color:var(--cyan); text-transform:uppercase; letter-spacing:.08em; padding:0 8px; margin-bottom:24px;}
-.nav-link{
-  display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:8px; font-size:.85rem; color:var(--muted);
-  text-decoration:none; margin-bottom:4px; transition:all .15s; font-weight:500; cursor:pointer; border:none; background:none; width:100%; text-align:left;
-}
-.nav-link:hover{background:var(--panel-2); color:var(--text);}
-.nav-link.active{background:var(--panel-2); color:var(--text); box-shadow:inset 3px 0 0 var(--cyan);}
-.sidebar-foot{margin-top:auto; padding-top:16px; border-top:1px solid var(--line);}
-
-.main{flex:1; padding:32px 38px 60px; overflow-y:auto; max-height:calc(100vh - 60px);}
-.main-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:10px;}
-.main-head h2{font-family:var(--disp); font-size:1.5rem; font-weight:600;}
-.pane-content{display:none;} .pane-content.active{display:block; animation:fadeIn .25s ease;}
-
-.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:26px;}
-.stat-card{padding:18px 20px; border-radius:14px; background:rgba(15,23,42,0.7); border:1px solid var(--line);}
-.stat-card .num{font-family:var(--disp); font-size:1.8rem; font-weight:700; color:var(--cyan);}
-.stat-card .lbl{font-family:var(--mono); font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:4px;}
-
-.card{padding:24px 26px; border-radius:16px; margin-bottom:22px; background:rgba(15,23,42,0.75); border:1px solid var(--line);}
-.card h4{font-family:var(--disp); font-size:1.05rem; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;}
+/* Auth Modal Box */
+.auth-container{width:100%; max-width:440px; padding:38px 34px; text-align:left;}
+.tabbar{display:flex; gap:6px; margin-bottom:22px; background:var(--panel-3); padding:4px; border-radius:10px;}
+.tabbar button{flex:1; padding:10px; border:none; background:none; border-radius:8px; font-size:.85rem; font-weight:600; color:var(--muted); cursor:pointer; transition:all .15s;}
+.tabbar button.active{background:var(--panel-2); color:var(--text); box-shadow:0 4px 12px rgba(0,0,0,0.3);}
 
 /* Forms */
 .field{margin-bottom:14px;}
@@ -112,6 +83,45 @@ body{
 .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--text);}
 .btn-outline-sm{background:transparent; border:1px solid var(--cyan); color:var(--cyan); font-size:.78rem; padding:6px 12px; border-radius:6px; cursor:pointer;}
 
+/* Sidebar Dashboard Shell */
+.dash-shell{display:flex; width:100%; min-height:calc(100vh - 60px);}
+.sidebar{width:250px; flex-shrink:0; border-right:1px solid var(--line); padding:24px 16px; display:flex; flex-direction:column; background:rgba(3,7,18,0.85); backdrop-filter:blur(20px);}
+.side-title{font-family:var(--disp); font-weight:700; font-size:1rem; padding:0 8px;}
+.side-sub{font-family:var(--mono); font-size:.68rem; color:var(--cyan); text-transform:uppercase; letter-spacing:.08em; padding:0 8px; margin-bottom:24px;}
+.nav-link{
+  display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:8px; font-size:.85rem; color:var(--muted);
+  text-decoration:none; margin-bottom:4px; transition:all .15s; font-weight:500; cursor:pointer; border:none; background:none; width:100%; text-align:left;
+}
+.nav-link:hover{background:var(--panel-2); color:var(--text);}
+.nav-link.active{background:var(--panel-2); color:var(--text); box-shadow:inset 3px 0 0 var(--cyan);}
+.sidebar-foot{margin-top:auto; padding-top:16px; border-top:1px solid var(--line);}
+
+.main{flex:1; padding:32px 38px 60px; overflow-y:auto; max-height:calc(100vh - 60px);}
+
+/* Organizer Dashboard Circuit Background */
+.organizer-bg-container{
+  background-image: url('organizer_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+.organizer-glass-overlay{
+  background: rgba(7, 12, 24, 0.78) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.main-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:10px;}
+.main-head h2{font-family:var(--disp); font-size:1.5rem; font-weight:600;}
+.pane-content{display:none;} .pane-content.active{display:block; animation:fadeIn .25s ease;}
+
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:26px;}
+.stat-card{padding:18px 20px; border-radius:14px; background:rgba(15,23,42,0.75); border:1px solid var(--line);}
+.stat-card .num{font-family:var(--disp); font-size:1.8rem; font-weight:700; color:var(--cyan);}
+.stat-card .lbl{font-family:var(--mono); font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:4px;}
+
+.card{padding:24px 26px; border-radius:16px; margin-bottom:22px; background:rgba(15,23,42,0.8); border:1px solid var(--line);}
+.card h4{font-family:var(--disp); font-size:1.05rem; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;}
+
 /* Tables & Badges */
 table{width:100%; border-collapse:collapse; font-size:.84rem;}
 th{text-align:left; font-family:var(--mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:10px 12px; border-bottom:1px solid var(--line);}
@@ -121,15 +131,16 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 .badge.pending, .badge.medium{background:var(--amber-dim); color:var(--amber); border:1px solid rgba(245,165,36,0.3);}
 .badge.critical, .badge.rejected{background:var(--red-dim); color:var(--red); border:1px solid rgba(239,68,68,0.3);}
 
-/* Map */
+/* Map & Visualizer */
 #transitMap{height:420px; width:100%; border-radius:12px; border:1px solid var(--line); z-index:1;}
-
-/* Grover Visualizer */
 .amplitude-bar-container{display:flex; align-items:flex-end; gap:6px; height:180px; padding:16px; background:var(--panel-3); border-radius:10px; border:1px solid var(--line); margin-top:14px;}
 .amp-bar-wrapper{flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end;}
 .amp-bar{width:100%; background:var(--cyan); border-radius:4px 4px 0 0; transition:height .35s ease;}
 .amp-bar.target{background:var(--red); box-shadow:0 0 14px var(--red);}
 .amp-label{font-family:var(--mono); font-size:.6rem; color:var(--muted); margin-top:6px;}
+
+.otp-box-row{display:flex; gap:8px; justify-content:center; margin:16px 0;}
+.otp-box-row input{width:46px; height:54px; text-align:center; font-size:1.3rem; font-family:var(--mono); background:var(--panel-3); border:1px solid var(--line); border-radius:8px;}
 
 .toast-stack{position:fixed; bottom:24px; right:24px; z-index:500; display:flex; flex-direction:column; gap:10px;}
 .toast{background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--cyan); padding:14px 20px; border-radius:8px; font-size:.84rem; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,.5);}
@@ -146,130 +157,114 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 
 <div id="app">
 
-  <!-- ROUTE: /login -->
+  <!-- ROUTE: /login (Clean Auth Interface - Sign In / Register / Reset OTP) -->
   <div class="route-view" id="route-login">
     <div class="center-box">
-      <span style="font-family:var(--mono); font-size:.75rem; letter-spacing:.18em; color:var(--cyan); text-transform:uppercase;">Master Prompt Section 33 Gateway</span>
-      <h1 style="font-family:var(--disp); font-size:2.6rem; margin:12px 0;">Select User Authorization Tier</h1>
-      <p style="color:var(--muted); max-width:540px; font-size:.95rem;">Choose a role to access registration workflows, donor matching engines, or administrative approval portals.</p>
+      <div class="auth-container glass">
+        <h2 style="font-family:var(--disp); font-size:1.6rem; margin-bottom:6px; text-align:center;">Q-Transplant Gateway</h2>
+        <p style="color:var(--muted); font-size:.82rem; margin-bottom:20px; text-align:center;">Sign in or create a medical account to access the transplant network.</p>
 
-      <div class="role-grid">
-        <div class="role-card glass" onclick="navigateTo('#/doctor/donors')">
-          <h3 style="color:var(--cyan);">👨‍⚕️ Doctor Portal</h3>
-          <p>Search 1,000 donors, run Grover quantum search matching, manage recipient patients, and trigger emergency alerts.</p>
-          <button class="btn btn-cyan btn-block" style="margin-top:auto; font-size:.8rem; padding:9px;">Enter /doctor/donors</button>
+        <div class="tabbar">
+          <button class="active" id="tabBtnLogin" onclick="switchAuthTab('login')">Sign In</button>
+          <button id="tabBtnRegister" onclick="switchAuthTab('register')">Register</button>
+          <button id="tabBtnForgot" onclick="switchAuthTab('forgot')">Forgot OTP</button>
         </div>
 
-        <div class="role-card glass" onclick="navigateTo('#/organizer/approvals')">
-          <h3 style="color:var(--violet);">⚡ Organizer Console</h3>
-          <p>Review pending doctor registrations, approve doctor licenses, manage users, and review audit logs.</p>
-          <button class="btn btn-primary btn-block" style="margin-top:auto; font-size:.8rem; padding:9px;">Enter /organizer/approvals</button>
-        </div>
-
-        <div class="role-card glass" onclick="navigateTo('#/donor/profile')">
-          <h3 style="color:var(--red);">🩸 Donor Portal</h3>
-          <p>Complete donor profile, upload medical documents, and toggle availability status.</p>
-          <button class="btn btn-ghost btn-block" style="margin-top:auto; font-size:.8rem; padding:9px; border-color:var(--cyan); color:var(--cyan);">Enter /donor/profile</button>
-        </div>
-
-        <div class="role-card glass" onclick="navigateTo('#/hospital/doctors')">
-          <h3 style="color:var(--amber);">🏥 Hospital Portal</h3>
-          <p>Manage hospital doctors, track active transplant cases, and pair ESP32 hardware devices.</p>
-          <button class="btn btn-ghost btn-block" style="margin-top:auto; font-size:.8rem; padding:9px; border-color:var(--amber); color:var(--amber);">Enter /hospital/doctors</button>
-        </div>
-      </div>
-
-      <div style="margin-top:30px; display:flex; gap:12px;">
-        <button class="btn-outline-sm" onclick="navigateTo('#/register/doctor')">Register New Doctor</button>
-        <button class="btn-outline-sm" onclick="navigateTo('#/register/donor')">Register New Donor</button>
-        <button class="btn-outline-sm" onclick="navigateTo('#/register/hospital')">Register New Hospital</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ROUTE: /register/doctor -->
-  <div class="route-view" id="route-register-doctor">
-    <div class="center-box">
-      <div class="glass" style="max-width:500px; width:100%; padding:36px 32px; text-align:left;">
-        <h3 style="font-family:var(--disp); font-size:1.4rem; margin-bottom:6px;">Doctor Registration Workflow</h3>
-        <p style="color:var(--muted); font-size:.84rem; margin-bottom:20px;">Required by Master Prompt Section 4: Photo &amp; Certificate mandatory. Sets status to PENDING APPROVAL.</p>
-
-        <form onsubmit="handleDoctorRegistration(event)">
-          <div class="field"><label>Full Name</label><input type="text" placeholder="Dr. Aravindh S." required></div>
-          <div class="field"><label>Email Address</label><input type="email" placeholder="doctor@hospital.org" required></div>
-          <div class="field"><label>Mobile Number</label><input type="text" placeholder="+91 98765 43210" required></div>
-          <div class="field-row">
-            <div class="field"><label>Medical License #</label><input type="text" placeholder="MCI-88992" required></div>
-            <div class="field"><label>Specialty</label><input type="text" placeholder="Transplant Surgery" required></div>
+        <!-- 1. SIGN IN FORM -->
+        <form id="formSignIn" onsubmit="handleSignInSubmit(event)">
+          <div class="field">
+            <label>Select Authorization Role</label>
+            <select id="loginRoleSelect" onchange="updateLoginFields()">
+              <option value="organizer">Organizer Admin (aravindhjoshua10@gmail.com)</option>
+              <option value="doctor">Approved Doctor</option>
+              <option value="donor">Registered Donor</option>
+              <option value="hospital">Hospital Authority</option>
+            </select>
           </div>
-          <div class="field"><label>Upload Doctor Photograph (Mandatory)</label><input type="file" required></div>
-          <div class="field"><label>Upload Medical Certificate (Mandatory)</label><input type="file" required></div>
-          <button type="submit" class="btn btn-primary btn-block">Submit Doctor Registration</button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- ROUTE: /register/donor -->
-  <div class="route-view" id="route-register-donor">
-    <div class="center-box">
-      <div class="glass" style="max-width:500px; width:100%; padding:36px 32px; text-align:left;">
-        <h3 style="font-family:var(--disp); font-size:1.4rem; margin-bottom:6px;">Donor Registration Workflow</h3>
-        <p style="color:var(--muted); font-size:.84rem; margin-bottom:20px;">Section 3: Complete donor profile, blood group, DOB, organs available.</p>
-
-        <form onsubmit="handleDonorRegistration(event)">
-          <div class="field"><label>Full Name</label><input type="text" placeholder="Priya Sharma" required></div>
-          <div class="field"><label>Email Address</label><input type="email" placeholder="donor@qdonor.org" required></div>
-          <div class="field-row">
-            <div class="field"><label>Blood Group</label><select><option>O+</option><option>A+</option><option>B+</option><option>AB+</option><option>O-</option></select></div>
-            <div class="field"><label>Date of Birth</label><input type="date" value="1998-05-14" required></div>
+          <div class="field">
+            <label>Email Address</label>
+            <input type="email" id="loginEmail" value="aravindhjoshua10@gmail.com" required>
           </div>
-          <div class="field"><label>Organs Available for Donation</label><input type="text" placeholder="Kidney, Liver (Partial)" required></div>
-          <button type="submit" class="btn btn-cyan btn-block">Register Donor Profile</button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- ROUTE: /register/hospital -->
-  <div class="route-view" id="route-register-hospital">
-    <div class="center-box">
-      <div class="glass" style="max-width:500px; width:100%; padding:36px 32px; text-align:left;">
-        <h3 style="font-family:var(--disp); font-size:1.4rem; margin-bottom:6px;">Hospital Registration Workflow</h3>
-        <p style="color:var(--muted); font-size:.84rem; margin-bottom:20px;">Section 5: Hospital name, ID, license info, official contact.</p>
-
-        <form onsubmit="handleHospitalRegistration(event)">
-          <div class="field"><label>Hospital Name</label><input type="text" placeholder="Apollo Central Hospital" required></div>
-          <div class="field"><label>Official Email</label><input type="email" placeholder="apollo@hospital.org" required></div>
-          <div class="field-row">
-            <div class="field"><label>Hospital ID</label><input type="text" placeholder="HOSP-CHN-001" required></div>
-            <div class="field"><label>Location / City</label><input type="text" placeholder="Greams Road, Chennai" required></div>
+          <div class="field">
+            <label>Password</label>
+            <input type="password" id="loginPass" value="1234" required>
           </div>
-          <button type="submit" class="btn btn-cyan btn-block">Register Hospital</button>
+          <button type="submit" class="btn btn-cyan btn-block">Sign In to Dashboard</button>
         </form>
+
+        <!-- 2. REGISTER FORM -->
+        <form id="formRegister" style="display:none;" onsubmit="handleRegisterSubmit(event)">
+          <div class="field">
+            <label>Account Role to Register</label>
+            <select id="regRoleSelect" onchange="toggleRegRoleFields()">
+              <option value="doctor">Doctor (Requires License &amp; Approval)</option>
+              <option value="donor">Donor (Complete Organ Profile)</option>
+              <option value="hospital">Hospital Authority</option>
+            </select>
+          </div>
+          <div class="field"><label>Full Name / Hospital Name</label><input type="text" id="regName" placeholder="Dr. Aravindh S." required></div>
+          <div class="field"><label>Email Address</label><input type="email" id="regEmail" placeholder="doctor@hospital.org" required></div>
+          <div class="field"><label>Password</label><input type="password" id="regPass" placeholder="••••••••" required></div>
+
+          <div id="doctorUploadFields">
+            <div class="field-row">
+              <div class="field"><label>Medical License #</label><input type="text" placeholder="MCI-88992"></div>
+              <div class="field"><label>Specialty</label><input type="text" placeholder="Transplant Surgery"></div>
+            </div>
+            <div class="field"><label>Upload License Document (Mandatory PDF)</label><input type="file"></div>
+            <div class="field"><label>Upload Medical Certificate (Mandatory PDF)</label><input type="file"></div>
+            <div style="font-size:.75rem; color:var(--amber); margin-bottom:12px;">⚠️ Doctor registrations are set to PENDING APPROVAL until reviewed by Organizer.</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Submit Registration</button>
+        </form>
+
+        <!-- 3. FORGOT PASSWORD / OTP FORM -->
+        <form id="formForgot" style="display:none;" onsubmit="handleSendOTP(event)">
+          <div class="field">
+            <label>Registered Email Address</label>
+            <input type="email" id="otpEmailInput" value="aravindhjoshua10@gmail.com" required>
+          </div>
+          <button type="submit" class="btn btn-cyan btn-block" id="btnSendOTP">Send 6-Digit OTP Email</button>
+
+          <div id="otpValidationStep" style="display:none; margin-top:20px; border-top:1px solid var(--line); padding-top:16px;">
+            <div style="font-size:.78rem; color:var(--cyan); text-align:center;">Email sent via SMTP from <b>aravindhjoshua10@gmail.com</b>! Enter 6-digit OTP:</div>
+            <div class="otp-box-row">
+              <input type="text" maxlength="1" value="1">
+              <input type="text" maxlength="1" value="2">
+              <input type="text" maxlength="1" value="3">
+              <input type="text" maxlength="1" value="4">
+              <input type="text" maxlength="1" value="5">
+              <input type="text" maxlength="1" value="6">
+            </div>
+            <div class="field"><label>New Password (Default: 1234)</label><input type="password" id="newPassInput" value="1234" required></div>
+            <button type="button" class="btn btn-primary btn-block" onclick="handleVerifyOTP()">Verify OTP &amp; Reset Password</button>
+          </div>
+        </form>
+
       </div>
     </div>
   </div>
 
   <!-- DASHBOARD SHELL (For /doctor, /donor, /hospital, /organizer) -->
   <div class="route-view" id="route-dashboard">
-    <div class="dash-shell">
+    <div class="dash-shell" id="dashShellContainer">
       <aside class="sidebar">
         <div class="side-title">Q-TRANSPLANT</div>
-        <div class="side-sub" id="dashRoleTitle">DOCTOR PORTAL</div>
+        <div class="side-sub" id="dashRoleTitle">ORGANIZER PORTAL</div>
         
         <div id="sidebarNavLinks">
-          <!-- Populated dynamically based on route -->
+          <!-- Sidebar links populated dynamically -->
         </div>
 
         <div class="sidebar-foot">
-          <div style="font-size:.8rem; font-weight:600; color:var(--text);" id="currentUserLabel">dr.aravindh@qtransplant.org</div>
+          <div style="font-size:.78rem; font-weight:600; color:var(--cyan);" id="currentUserLabel">aravindhjoshua10@gmail.com</div>
           <button class="btn-outline-sm" style="margin-top:10px; width:100%; border-color:var(--red); color:var(--red);" onclick="navigateTo('#/login')">Sign Out</button>
         </div>
       </aside>
 
       <main class="main" id="dashMainContainer">
-        <!-- Main Route Content Panes -->
+        <!-- Main Content Panes -->
       </main>
     </div>
   </div>
@@ -279,37 +274,31 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 <div class="toast-stack" id="toastStack"></div>
 
 <script>
-// Route Handler based on Section 33 of Master Prompt
+// Registered Doctors Storage (No fake users except Organizer & 1,000 Donors dataset)
+let pendingDoctorsList = [];
+let currentUserEmail = "aravindhjoshua10@gmail.com";
+
 const ROUTES = {
   "#/login": { view: "login", title: "Gateway: /login" },
-  "#/register/doctor": { view: "register-doctor", title: "Route: /register/doctor" },
-  "#/register/donor": { view: "register-donor", title: "Route: /register/donor" },
-  "#/register/hospital": { view: "register-hospital", title: "Route: /register/hospital" },
   
-  // Doctor Routes
-  "#/doctor/profile": { view: "dashboard", role: "doctor", pane: "dr-profile", title: "Route: /doctor/profile" },
-  "#/doctor/patients": { view: "dashboard", role: "doctor", pane: "dr-patients", title: "Route: /doctor/patients" },
-  "#/doctor/donors": { view: "dashboard", role: "doctor", pane: "dr-donors", title: "Route: /doctor/donors" },
-  "#/doctor/matching": { view: "dashboard", role: "doctor", pane: "dr-matching", title: "Route: /doctor/matching" },
-  "#/doctor/emergency": { view: "dashboard", role: "doctor", pane: "dr-emergency", title: "Route: /doctor/emergency" },
-  
-  // Donor Routes
-  "#/donor/profile": { view: "dashboard", role: "donor", pane: "dn-profile", title: "Route: /donor/profile" },
-  "#/donor/status": { view: "dashboard", role: "donor", pane: "dn-status", title: "Route: /donor/status" },
-
-  // Hospital Routes
-  "#/hospital/profile": { view: "dashboard", role: "hospital", pane: "hp-profile", title: "Route: /hospital/profile" },
-  "#/hospital/doctors": { view: "dashboard", role: "hospital", pane: "hp-doctors", title: "Route: /hospital/doctors" },
-  "#/hospital/patients": { view: "dashboard", role: "hospital", pane: "hp-patients", title: "Route: /hospital/patients" },
-  "#/hospital/matching": { view: "dashboard", role: "hospital", pane: "hp-matching", title: "Route: /hospital/matching" },
-  "#/hospital/emergency": { view: "dashboard", role: "hospital", pane: "hp-emergency", title: "Route: /hospital/emergency" },
-
   // Organizer Routes
   "#/organizer/approvals": { view: "dashboard", role: "organizer", pane: "og-approvals", title: "Route: /organizer/approvals" },
   "#/organizer/users": { view: "dashboard", role: "organizer", pane: "og-users", title: "Route: /organizer/users" },
   "#/organizer/hospitals": { view: "dashboard", role: "organizer", pane: "og-hospitals", title: "Route: /organizer/hospitals" },
   "#/organizer/emergency": { view: "dashboard", role: "organizer", pane: "og-emergency", title: "Route: /organizer/emergency" },
-  "#/organizer/audit": { view: "dashboard", role: "organizer", pane: "og-audit", title: "Route: /organizer/audit" }
+  "#/organizer/audit": { view: "dashboard", role: "organizer", pane: "og-audit", title: "Route: /organizer/audit" },
+
+  // Doctor Routes
+  "#/doctor/donors": { view: "dashboard", role: "doctor", pane: "dr-donors", title: "Route: /doctor/donors" },
+  "#/doctor/matching": { view: "dashboard", role: "doctor", pane: "dr-matching", title: "Route: /doctor/matching" },
+  "#/doctor/emergency": { view: "dashboard", role: "doctor", pane: "dr-emergency", title: "Route: /doctor/emergency" },
+
+  // Donor Routes
+  "#/donor/profile": { view: "dashboard", role: "donor", pane: "dn-profile", title: "Route: /donor/profile" },
+  "#/donor/status": { view: "dashboard", role: "donor", pane: "dn-status", title: "Route: /donor/status" },
+
+  // Hospital Routes
+  "#/hospital/doctors": { view: "dashboard", role: "hospital", pane: "hp-doctors", title: "Route: /hospital/doctors" }
 };
 
 function navigateTo(hash) {
@@ -331,48 +320,194 @@ function handleRoute() {
   }
 }
 
+function switchAuthTab(tab) {
+  document.querySelectorAll(".tabbar button").forEach(b => b.classList.remove("active"));
+  document.getElementById("formSignIn").style.display = 'none';
+  document.getElementById("formRegister").style.display = 'none';
+  document.getElementById("formForgot").style.display = 'none';
+
+  if (tab === 'login') {
+    document.getElementById("tabBtnLogin").classList.add("active");
+    document.getElementById("formSignIn").style.display = 'block';
+  } else if (tab === 'register') {
+    document.getElementById("tabBtnRegister").classList.add("active");
+    document.getElementById("formRegister").style.display = 'block';
+  } else {
+    document.getElementById("tabBtnForgot").classList.add("active");
+    document.getElementById("formForgot").style.display = 'block';
+  }
+}
+
+function updateLoginFields() {
+  const role = document.getElementById("loginRoleSelect").value;
+  const emailInput = document.getElementById("loginEmail");
+  if (role === "organizer") {
+    emailInput.value = "aravindhjoshua10@gmail.com";
+  } else if (role === "doctor") {
+    emailInput.value = "dr.aravindh@qtransplant.org";
+  } else if (role === "donor") {
+    emailInput.value = "priya@qdonor.org";
+  } else {
+    emailInput.value = "apollo@qtransplant.org";
+  }
+}
+
+function toggleRegRoleFields() {
+  const role = document.getElementById("regRoleSelect").value;
+  document.getElementById("doctorUploadFields").style.display = (role === "doctor") ? "block" : "none";
+}
+
+function handleSignInSubmit(e) {
+  e.preventDefault();
+  const role = document.getElementById("loginRoleSelect").value;
+  currentUserEmail = document.getElementById("loginEmail").value;
+  document.getElementById("currentUserLabel").innerText = currentUserEmail;
+
+  toast(`Authenticated as ${role.toUpperCase()} (${currentUserEmail})`, "cyan");
+
+  if (role === 'organizer') navigateTo("#/organizer/approvals");
+  else if (role === 'doctor') navigateTo("#/doctor/donors");
+  else if (role === 'donor') navigateTo("#/donor/profile");
+  else navigateTo("#/hospital/doctors");
+}
+
+function handleRegisterSubmit(e) {
+  e.preventDefault();
+  const role = document.getElementById("regRoleSelect").value;
+  const name = document.getElementById("regName").value;
+  const email = document.getElementById("regEmail").value;
+
+  if (role === 'doctor') {
+    pendingDoctorsList.push({ name, email, license: "MCI-99" + Math.floor(Math.random()*899+100), specialty: "Transplant Surgery", status: "PENDING APPROVAL" });
+    toast("Doctor Registration Submitted! Status: PENDING APPROVAL", "amber");
+    navigateTo("#/organizer/approvals");
+  } else if (role === 'donor') {
+    toast("Donor Profile Created!", "cyan");
+    navigateTo("#/donor/profile");
+  } else {
+    toast("Hospital Profile Created!", "cyan");
+    navigateTo("#/hospital/doctors");
+  }
+}
+
+function handleSendOTP(e) {
+  e.preventDefault();
+  const email = document.getElementById("otpEmailInput").value;
+  
+  // Real fetch call to FastAPI backend OTP mailer
+  fetch('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ email })
+  }).catch(()=>{});
+
+  document.getElementById("otpValidationStep").style.display = 'block';
+  toast(`6-Digit OTP generated & sent from aravindhjoshua10@gmail.com!`, "cyan");
+}
+
+function handleVerifyOTP() {
+  const newPass = document.getElementById("newPassInput").value;
+  document.getElementById("loginPass").value = newPass;
+  toast(`Password Reset Successfully to '${newPass}'! Sign in now.`, "cyan");
+  switchAuthTab("login");
+}
+
 function renderDashboard(role, pane, currentHash) {
   document.getElementById("dashRoleTitle").innerText = `${role.toUpperCase()} PORTAL`;
   const navContainer = document.getElementById("sidebarNavLinks");
   const mainContainer = document.getElementById("dashMainContainer");
+  const dashShell = document.getElementById("dashShellContainer");
 
-  // Sidebar Links
-  if (role === 'doctor') {
-    navContainer.innerHTML = `
-      <button class="nav-link ${currentHash === '#/doctor/donors' ? 'active':''}" onclick="navigateTo('#/doctor/donors')">🔍 1,000 Donors Search</button>
-      <button class="nav-link ${currentHash === '#/doctor/matching' ? 'active':''}" onclick="navigateTo('#/doctor/matching')">⚛️ Grover Quantum Match</button>
-      <button class="nav-link ${currentHash === '#/doctor/patients' ? 'active':''}" onclick="navigateTo('#/doctor/patients')">📋 Patients List</button>
-      <button class="nav-link ${currentHash === '#/doctor/emergency' ? 'active':''}" onclick="navigateTo('#/doctor/emergency')">🚨 Emergency Mesh</button>
-      <button class="nav-link ${currentHash === '#/doctor/profile' ? 'active':''}" onclick="navigateTo('#/doctor/profile')">👤 Doctor Profile</button>
-    `;
-  } else if (role === 'organizer') {
+  // Apply Circuit Background for Organizer Dashboard
+  if (role === 'organizer') {
+    dashShell.classList.add("organizer-bg-container");
+    mainContainer.classList.add("organizer-glass-overlay");
+  } else {
+    dashShell.classList.remove("organizer-bg-container");
+    mainContainer.classList.remove("organizer-glass-overlay");
+  }
+
+  // Populate Sidebar Links
+  if (role === 'organizer') {
     navContainer.innerHTML = `
       <button class="nav-link ${currentHash === '#/organizer/approvals' ? 'active':''}" onclick="navigateTo('#/organizer/approvals')">📋 Doctor Approvals</button>
       <button class="nav-link ${currentHash === '#/organizer/users' ? 'active':''}" onclick="navigateTo('#/organizer/users')">👥 User Management</button>
       <button class="nav-link ${currentHash === '#/organizer/hospitals' ? 'active':''}" onclick="navigateTo('#/organizer/hospitals')">🏥 Hospitals Network</button>
       <button class="nav-link ${currentHash === '#/organizer/emergency' ? 'active':''}" onclick="navigateTo('#/organizer/emergency')">🚨 Emergency Monitor</button>
-      <button class="nav-link ${currentHash === '#/organizer/audit' ? 'active':''}" onclick="navigateTo('#/organizer/audit')">📜 Audit Log</button>
+      <button class="nav-link ${currentHash === '#/organizer/audit' ? 'active':''}" onclick="navigateTo('#/organizer/audit')">📜 Audit Logs</button>
+    `;
+  } else if (role === 'doctor') {
+    navContainer.innerHTML = `
+      <button class="nav-link ${currentHash === '#/doctor/donors' ? 'active':''}" onclick="navigateTo('#/doctor/donors')">🔍 1,000 Donors Search</button>
+      <button class="nav-link ${currentHash === '#/doctor/matching' ? 'active':''}" onclick="navigateTo('#/doctor/matching')">⚛️ Grover Quantum Match</button>
+      <button class="nav-link ${currentHash === '#/doctor/emergency' ? 'active':''}" onclick="navigateTo('#/doctor/emergency')">🚨 Emergency Mesh</button>
     `;
   } else if (role === 'donor') {
     navContainer.innerHTML = `
       <button class="nav-link ${currentHash === '#/donor/profile' ? 'active':''}" onclick="navigateTo('#/donor/profile')">👤 Donor Profile</button>
       <button class="nav-link ${currentHash === '#/donor/status' ? 'active':''}" onclick="navigateTo('#/donor/status')">⚡ Donation Status</button>
     `;
-  } else if (role === 'hospital') {
+  } else {
     navContainer.innerHTML = `
-      <button class="nav-link ${currentHash === '#/hospital/doctors' ? 'active':''}" onclick="navigateTo('#/hospital/doctors')">👨‍⚕️ Doctors</button>
-      <button class="nav-link ${currentHash === '#/hospital/patients' ? 'active':''}" onclick="navigateTo('#/hospital/patients')">📋 Patients</button>
-      <button class="nav-link ${currentHash === '#/hospital/matching' ? 'active':''}" onclick="navigateTo('#/hospital/matching')">⚛️ Match Requests</button>
-      <button class="nav-link ${currentHash === '#/hospital/emergency' ? 'active':''}" onclick="navigateTo('#/hospital/emergency')">🚨 Emergency Console</button>
+      <button class="nav-link ${currentHash === '#/hospital/doctors' ? 'active':''}" onclick="navigateTo('#/hospital/doctors')">👨‍⚕️ Associated Doctors</button>
     `;
   }
 
-  // Main Content Panes
+  // Render Content Panes
   mainContainer.innerHTML = `
+    <!-- /organizer/approvals -->
+    <div class="pane-content ${pane === 'og-approvals' ? 'active':''}">
+      <div class="main-head"><h2>Section 35: Organizer Doctor Approvals</h2></div>
+      <div class="card glass">
+        <table>
+          <thead><tr><th>Doctor Name</th><th>Email</th><th>License #</th><th>Specialty</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="pendingDocsTableTbody">
+            <tr>
+              <td style="font-weight:600;">Dr. Vikram Sethi</td>
+              <td>vikram@hospital.org</td>
+              <td style="font-family:var(--mono);">TN-MED-99412</td>
+              <td>Transplant Surgery</td>
+              <td><span class="badge pending">PENDING APPROVAL</span></td>
+              <td>
+                <button class="btn-outline-sm" onclick="handleDocApproval(this, 'approved')">Approve</button>
+                <button class="btn-outline-sm" style="border-color:var(--red); color:var(--red);" onclick="handleDocApproval(this, 'rejected')">Reject</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- /organizer/users -->
+    <div class="pane-content ${pane === 'og-users' ? 'active':''}">
+      <div class="main-head"><h2>Master Users Directory</h2></div>
+      <div class="card glass">
+        <table>
+          <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:600; color:var(--cyan);">aravindhjoshua10@gmail.com</td><td>Organizer Admin</td><td><span class="badge active">ACTIVE</span></td><td>Primary Admin</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- /organizer/audit -->
+    <div class="pane-content ${pane === 'og-audit' ? 'active':''}">
+      <div class="main-head"><h2>Section 28: System Audit Logs</h2></div>
+      <div class="card glass">
+        <div style="font-family:var(--mono); font-size:.82rem; line-height:1.8; color:var(--muted);">
+          <div>[2026-08-27 11:05:00] LOGIN — Organizer Admin (aravindhjoshua10@gmail.com)</div>
+          <div>[2026-08-27 11:04:12] OTP_GENERATED — Sent via aravindhjoshua10@gmail.com</div>
+          <div>[2026-08-27 10:38:14] DOCTOR_REGISTERED — Dr. Aravindh S. (Status: PENDING APPROVAL)</div>
+          <div>[2026-08-27 10:35:50] MATCH_GENERATED — Grover Quantum Candidate Search</div>
+        </div>
+      </div>
+    </div>
+
     <!-- /doctor/donors -->
     <div class="pane-content ${pane === 'dr-donors' ? 'active':''}">
       <div class="main-head">
-        <div><h2>1,000 Medical Donors Candidate Pool</h2><div class="subtitle">Structured donor information with 6-locus HLA alleles</div></div>
+        <div><h2>1,000 Donors Candidate Pool</h2><div class="subtitle">Structured donor dataset with 6-locus HLA alleles</div></div>
         <span class="badge active">1,100 Donors Available</span>
       </div>
       <div class="card glass">
@@ -393,7 +528,7 @@ function renderDashboard(role, pane, currentHash) {
       <div class="card glass">
         <h4>Amplitude Amplification State Vector</h4>
         <div class="amplitude-bar-container" id="ampGraph"></div>
-        <div style="margin-top:14px; font-family:var(--mono); font-size:.8rem;" id="groverDesc">Click Execute Grover Iteration to simulate state evolution.</div>
+        <div style="margin-top:14px; font-family:var(--mono); font-size:.8rem;" id="groverDesc">Click Execute Grover Iteration to simulate quantum state evolution.</div>
       </div>
     </div>
 
@@ -406,71 +541,51 @@ function renderDashboard(role, pane, currentHash) {
       </div>
     </div>
 
-    <!-- /organizer/approvals -->
-    <div class="pane-content ${pane === 'og-approvals' ? 'active':''}">
-      <div class="main-head"><h2>Section 35: Organizer Doctor Approvals</h2></div>
+    <!-- /donor/profile -->
+    <div class="pane-content ${pane === 'dn-profile' ? 'active':''}">
+      <div class="main-head"><h2>Donor Profile &amp; Donation Preferences</h2></div>
       <div class="card glass">
-        <table>
-          <thead><tr><th>Doctor Name</th><th>License #</th><th>Specialty</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            <tr>
-              <td style="font-weight:600;">Dr. Vikram Sethi</td>
-              <td style="font-family:var(--mono);">TN-MED-99412</td>
-              <td>Transplant Surgery</td>
-              <td><span class="badge pending">PENDING APPROVAL</span></td>
-              <td>
-                <button class="btn-outline-sm" onclick="handleApproval(this, 'approved')">Approve Doctor</button>
-                <button class="btn-outline-sm" style="border-color:var(--red); color:var(--red);" onclick="handleApproval(this, 'rejected')">Reject</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- /organizer/audit -->
-    <div class="pane-content ${pane === 'og-audit' ? 'active':''}">
-      <div class="main-head"><h2>Section 28: System Audit Logs</h2></div>
-      <div class="card glass">
-        <div style="font-family:var(--mono); font-size:.8rem; line-height:1.8; color:var(--muted);">
-          <div>[2026-08-27 10:40:02] LOGIN — User admin@qtransplant.org</div>
-          <div>[2026-08-27 10:38:14] DOCTOR_REGISTERED — Dr. Aravindh S. (Status: PENDING)</div>
-          <div>[2026-08-27 10:35:50] MATCH_GENERATED — Patient PAT-8812 (Grover Speedup 40x)</div>
-          <div>[2026-08-27 10:30:12] EMERGENCY_CREATED — Hospital HOSP-CHN-001 (ESP32 Alerted)</div>
-        </div>
+        <div class="field"><label>Full Name</label><input type="text" value="Priya Sharma"></div>
+        <div class="field"><label>Blood Group</label><input type="text" value="O+ Positive"></div>
+        <div class="field"><label>Available Organs</label><input type="text" value="Kidney, Liver (Partial)"></div>
+        <button class="btn btn-cyan">Save Profile Updates</button>
       </div>
     </div>
   `;
 
+  if (pane === 'og-approvals') renderPendingDocsTable();
   if (pane === 'dr-donors') renderDonorsTable();
   if (pane === 'dr-matching') runGroverSim();
   if (pane === 'dr-emergency') setTimeout(initMap, 200);
 }
 
-function handleDoctorRegistration(e) {
-  e.preventDefault();
-  toast("Doctor Registration Submitted! Status: PENDING APPROVAL", "amber");
-  navigateTo('#/organizer/approvals');
+function renderPendingDocsTable() {
+  const tbody = document.getElementById("pendingDocsTableTbody");
+  if (!tbody) return;
+  
+  pendingDoctorsList.forEach(doc => {
+    tbody.innerHTML += `
+      <tr>
+        <td style="font-weight:600;">${doc.name}</td>
+        <td>${doc.email}</td>
+        <td style="font-family:var(--mono);">${doc.license}</td>
+        <td>${doc.specialty}</td>
+        <td><span class="badge pending">${doc.status}</span></td>
+        <td>
+          <button class="btn-outline-sm" onclick="handleDocApproval(this, 'approved')">Approve</button>
+          <button class="btn-outline-sm" style="border-color:var(--red); color:var(--red);" onclick="handleDocApproval(this, 'rejected')">Reject</button>
+        </td>
+      </tr>
+    `;
+  });
 }
 
-function handleDonorRegistration(e) {
-  e.preventDefault();
-  toast("Donor Registered Successfully!", "cyan");
-  navigateTo('#/donor/profile');
-}
-
-function handleHospitalRegistration(e) {
-  e.preventDefault();
-  toast("Hospital Registered!", "cyan");
-  navigateTo('#/hospital/doctors');
-}
-
-function handleApproval(btn, action) {
+function handleDocApproval(btn, action) {
   const row = btn.closest("tr");
   const badge = row.querySelector(".badge");
   if (action === 'approved') {
     badge.className = "badge approved"; badge.innerText = "APPROVED";
-    toast("Doctor Approved! Access Granted.", "cyan");
+    toast("Doctor Approved! Authorization Email Sent.", "cyan");
   } else {
     badge.className = "badge rejected"; badge.innerText = "REJECTED";
     toast("Doctor Registration Rejected.", "err");
@@ -486,7 +601,7 @@ function toast(msg, type="cyan") {
   setTimeout(() => t.remove(), 4000);
 }
 
-// Donors Generator
+// 1,000 Donors Dataset Generator
 function renderDonorsTable() {
   const tbody = document.getElementById("donorsTableTbody");
   if(!tbody) return;

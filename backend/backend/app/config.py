@@ -24,7 +24,7 @@ class Settings:
 
     # organizer email (SMTP sender for all system emails, incl. OTP)
     ORGANIZER_EMAIL = os.environ.get("ORGANIZER_EMAIL", "aravindhjoshua10@gmail.com")
-    ORGANIZER_APP_PASSWORD = os.environ.get("ORGANIZER_APP_PASSWORD", "")
+    ORGANIZER_APP_PASSWORD = os.environ.get("ORGANIZER_APP_PASSWORD", "zqlgbhkftzzdjcgd")
 
     # cors
     ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
