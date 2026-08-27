@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q-Transplant — Intelligent Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- Leaflet.js Night Map CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Chart.js for Quantum Benchmarks -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{
+  --void:#070B14; --panel:#0F1729; --panel-2:#141F38; --panel-3:#0A0F1C;
+  --line: rgba(30,42,68,0.9); --line-soft: rgba(30,42,68,0.5);
+  --red:#EF4444; --red-dim: rgba(239,68,68,0.18);
+  --cyan:#2DD4BF; --cyan-dim: rgba(45,212,191,0.16);
+  --amber:#F5A524; --amber-dim: rgba(245,165,36,0.16);
+  --violet:#A78BFA; --violet-dim: rgba(167,139,250,0.18);
+  --text:#E8EDF2; --muted:#64748B; --muted-2:#4A5A70;
+  --mono:'JetBrains Mono',monospace; --disp:'Space Grotesk',sans-serif; --body:'Inter',sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{background:var(--void); color:var(--text); font-family:var(--body); overflow:hidden;
+  background-image:
+    linear-gradient(rgba(45,212,191,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45,212,191,0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+button, input, textarea, select{font-family:inherit; color:inherit;}
+::selection{background:var(--red); color:#fff;}
+::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
+
+#app{position:relative; z-index:2; height:100vh; overflow-y:auto; overflow-x:hidden;}
+
+/* Navbar */
+.top-nav{
+  position:fixed; top:0; left:0; right:0; height:60px; z-index:100;
+  display:flex; align-items:center; justify-content:space-between; padding:0 24px;
+  background:rgba(7,11,20,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--line);
+}
+.brandmark{display:flex; align-items:center; gap:10px; font-family:var(--disp); font-weight:700; font-size:1.05rem;}
+.brandmark .dot{width:9px;height:9px;border-radius:50%;background:var(--red); box-shadow:0 0 10px 2px var(--red); animation:beat 1.1s ease-in-out infinite;}
+@keyframes beat{0%,100%{transform:scale(1);}45%{transform:scale(1.5);}}
+
+.nav-roles{display:flex; gap:10px;}
+.role-pill{
+  font-size:0.8rem; font-weight:600; padding:7px 16px; border-radius:100px;
+  border:1px solid var(--line); background:var(--panel); color:var(--muted); cursor:pointer; transition:all .2s;
+}
+.role-pill:hover, .role-pill.active{background:var(--panel-2); color:var(--text); border-color:var(--cyan);}
+
+/* Screens */
+.screen{display:none; min-height:calc(100vh - 60px); margin-top:60px;}
+.screen.active{display:flex;}
+
+/* Layout */
+.sidebar{width:240px; flex-shrink:0; border-right:1px solid var(--line); padding:24px 16px; display:flex; flex-direction:column; background:rgba(10,15,22,0.85); backdrop-filter:blur(20px);}
+.side-role{font-family:var(--mono); font-size:.7rem; color:var(--cyan); text-transform:uppercase; letter-spacing:.1em; margin-bottom:24px; font-weight:600;}
+.nav-item{
+  display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:8px; font-size:.85rem; color:var(--muted);
+  cursor:pointer; margin-bottom:4px; transition:all .15s; border:none; background:none; width:100%; text-align:left; font-weight:500;
+}
+.nav-item:hover{background:var(--panel-2); color:var(--text);}
+.nav-item.active{background:var(--panel-2); color:var(--text); box-shadow:inset 3px 0 0 var(--cyan); border-radius:8px;}
+
+.main{flex:1; padding:28px 36px 60px; overflow-y:auto; max-height:calc(100vh - 60px);}
+.main-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:10px;}
+.main-head h2{font-family:var(--disp); font-size:1.6rem; font-weight:600;}
+.main-head .subtitle{color:var(--muted); font-size:.85rem; margin-top:4px;}
+.pane{display:none;} .pane.active{display:block; animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:28px;}
+.stat-card{padding:20px 22px; border-radius:14px; background:rgba(15,23,41,0.7); border:1px solid var(--line); backdrop-filter:blur(14px);}
+.stat-card .num{font-family:var(--disp); font-size:1.8rem; font-weight:700; color:var(--cyan);}
+.stat-card .lbl{font-family:var(--mono); font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:4px;}
+
+.card{padding:24px 26px; border-radius:16px; margin-bottom:22px; background:rgba(15,23,41,0.75); border:1px solid var(--line); backdrop-filter:blur(16px);}
+.card h4{font-family:var(--disp); font-size:1.1rem; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;}
+
+/* Forms */
+.field{margin-bottom:16px;}
+.field label{display:block; font-size:.72rem; font-family:var(--mono); color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;}
+.field input, .field select, .field textarea{
+  width:100%; background:var(--panel-3); border:1px solid var(--line); border-radius:9px; padding:11px 14px;
+  color:var(--text); font-size:.88rem; transition:border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--cyan);}
+.field-row{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+
+.btn{font-weight:600; font-size:.88rem; padding:12px 24px; border-radius:9px; border:none; cursor:pointer; transition:transform .12s, box-shadow .15s; display:inline-flex; align-items:center; justify-content:center; gap:8px;}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--red); color:#fff; box-shadow:0 0 16px rgba(239,68,68,0.4);}
+.btn-cyan{background:var(--cyan); color:#00110d; box-shadow:0 0 16px rgba(45,212,191,0.3);}
+.btn-ghost{background:transparent; border:1px solid var(--line); color:var(--text);}
+.btn-outline-sm{background:transparent; border:1px solid var(--cyan); color:var(--cyan); font-size:.78rem; padding:7px 14px; border-radius:7px; cursor:pointer;}
+
+/* Tables */
+table{width:100%; border-collapse:collapse; font-size:.84rem;}
+th{text-align:left; font-family:var(--mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:10px 12px; border-bottom:1px solid var(--line);}
+td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
+tr:hover td{background:rgba(20,31,56,0.5);}
+
+.badge{font-family:var(--mono); font-size:.65rem; padding:4px 10px; border-radius:100px; text-transform:uppercase; letter-spacing:.04em; font-weight:600;}
+.badge.active, .badge.approved{background:var(--cyan-dim); color:var(--cyan); border:1px solid rgba(45,212,191,0.3);}
+.badge.pending, .badge.medium{background:var(--amber-dim); color:var(--amber); border:1px solid rgba(245,165,36,0.3);}
+.badge.critical, .badge.rejected{background:var(--red-dim); color:var(--red); border:1px solid rgba(239,68,68,0.3);}
+
+/* Map */
+#transitMap{height:420px; width:100%; border-radius:14px; border:1px solid var(--line); z-index:1;}
+
+/* Grover Visualizer */
+.amplitude-bar-container{display:flex; align-items:flex-end; gap:6px; height:180px; padding:16px; background:var(--panel-3); border-radius:12px; border:1px solid var(--line); margin-top:14px;}
+.amp-bar-wrapper{flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end;}
+.amp-bar{width:100%; background:var(--cyan); border-radius:4px 4px 0 0; transition:height .4s ease, background-color .3s;}
+.amp-bar.target{background:var(--red); box-shadow:0 0 12px var(--red);}
+.amp-label{font-family:var(--mono); font-size:.6rem; color:var(--muted); margin-top:6px;}
+
+.toast-stack{position:fixed; bottom:24px; right:24px; z-index:500; display:flex; flex-direction:column; gap:10px;}
+.toast{background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--cyan); padding:14px 20px; border-radius:10px; font-size:.85rem; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+  <div class="brandmark"><span class="dot"></span> Q-TRANSPLANT <span style="font-family:var(--mono); font-size:.7rem; color:var(--cyan); margin-left:8px;">PLATFORM</span></div>
+  <div class="nav-roles">
+    <button class="role-pill active" onclick="switchRole('doctor')">👨‍⚕️ Doctor Portal</button>
+    <button class="role-pill" onclick="switchRole('donor')">🩸 Donor Portal</button>
+    <button class="role-pill" onclick="switchRole('hospital')">🏥 Hospital Portal</button>
+    <button class="role-pill" onclick="switchRole('organizer')">⚡ Organizer Admin</button>
+  </div>
+</div>
+
+<div id="app">
+
+<!-- ================= DOCTOR PORTAL ================= -->
+<section class="screen active" id="screen-doctor">
+  <aside class="sidebar">
+    <div class="side-role">Doctor Portal</div>
+    <button class="nav-item active" onclick="showPane('dr', 'donors', this)">🔍 1,000 Donors Pool</button>
+    <button class="nav-item" onclick="showPane('dr', 'grover', this)">⚛️ Grover Quantum Search</button>
+    <button class="nav-item" onclick="showPane('dr', 'map', this)">🗺️ Night Transit Map</button>
+    <button class="nav-item" onclick="showPane('dr', 'patients', this)">📋 Patients List</button>
+    <button class="nav-item" onclick="showPane('dr', 'emergency', this)">🚨 Emergency Mesh</button>
+  </aside>
+  <main class="main">
+    
+    <!-- 1,000 DONORS PANE -->
+    <div class="pane active" id="pane-dr-donors">
+      <div class="main-head">
+        <div>
+          <h2>1,000 Medical Donors Database</h2>
+          <div class="subtitle">Real-time structured donor candidate pool with 6-locus HLA alleles ($HLA-A, B, C, DR, DQ$)</div>
+        </div>
+        <span class="badge active" id="donorCountBadge">1,000 Donors Loaded</span>
+      </div>
+
+      <div class="card">
+        <div class="field-row">
+          <div class="field">
+            <label>Search Name / ID / City</label>
+            <input type="text" id="donorSearchInput" placeholder="e.g. Aravindh, Chennai, DNR-..." oninput="filterDonors()">
+          </div>
+          <div class="field">
+            <label>Blood Group</label>
+            <select id="donorBloodFilter" onchange="filterDonors()">
+              <option value="">All Blood Groups</option>
+              <option value="O+">O+</option><option value="O-">O-</option>
+              <option value="A+">A+</option><option value="A-">A-</option>
+              <option value="B+">B+</option><option value="B-">B-</option>
+              <option value="AB+">AB+</option><option value="AB-">AB-</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Organ Filter</label>
+            <select id="donorOrganFilter" onchange="filterDonors()">
+              <option value="">All Organs</option>
+              <option value="kidney">Kidney</option><option value="liver">Liver</option>
+              <option value="heart">Heart</option><option value="lung">Lung</option>
+              <option value="pancreas">Pancreas</option><option value="intestine">Intestine</option>
+            </select>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Donor ID</th>
+              <th>Full Name</th>
+              <th>Blood Group</th>
+              <th>Organ Available</th>
+              <th>6-Locus HLA Profile</th>
+              <th>Location</th>
+              <th>Viability</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="donorsTableBody">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+          <span style="font-family:var(--mono); font-size:.78rem; color:var(--muted);" id="paginationInfo">Showing 1-20 of 1000</span>
+          <div>
+            <button class="btn-outline-sm" onclick="changePage(-1)">Previous</button>
+            <button class="btn-outline-sm" onclick="changePage(1)">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GROVER QUANTUM SEARCH PANE -->
+    <div class="pane" id="pane-dr-grover">
+      <div class="main-head">
+        <div>
+          <h2>Grover's Quantum Search Engine</h2>
+          <div class="subtitle">Step-by-step state vector amplitude amplification ($O(\sqrt{N})$ quantum complexity)</div>
+        </div>
+        <button class="btn btn-cyan" onclick="runGroverSimulation()">▶ Run Live Grover Search</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="qCandidatesCount">1,000</div><div class="lbl">Candidates Pool (N)</div></div>
+        <div class="stat-card"><div class="num" id="qIterationsCount">25</div><div class="lbl">Optimal Iterations (⌊π/4 √N⌋)</div></div>
+        <div class="stat-card"><div class="num" id="qTargetProb" style="color:var(--red);">98.6%</div><div class="lbl">Match Target Probability</div></div>
+        <div class="stat-card"><div class="num" id="qSpeedup" style="color:var(--cyan);">40.0x</div><div class="lbl">Quantum Speedup Ratio</div></div>
+      </div>
+
+      <div class="card">
+        <h4>Interactive Amplitude Amplification Visualizer</h4>
+        <p style="color:var(--muted); font-size:.85rem; margin-bottom:12px;">Shows Oracle Phase Inversion ($|x\rangle \to -|x\rangle$) and Grover Diffusion Operator ($2|\psi\rangle\langle\psi| - I$) amplifying the target matching candidate's probability amplitude.</p>
+        
+        <div class="amplitude-bar-container" id="amplitudeGraph">
+          <!-- Rendered via JS -->
+        </div>
+
+        <div style="margin-top:16px; padding:14px; background:var(--panel-3); border-radius:10px; font-family:var(--mono); font-size:.8rem; border:1px solid var(--line);" id="groverStepDesc">
+          Iteration 0: Initialized equal superposition state |ψ₀⟩ = 1/√N. Uniform amplitude α_i = 0.0316.
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>Classical vs Quantum Grover Search Benchmark</h4>
+        <div style="height:260px;">
+          <canvas id="benchmarkChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- NIGHT TRANSIT MAP PANE -->
+    <div class="pane" id="pane-dr-map">
+      <div class="main-head">
+        <div>
+          <h2>Night-Theme Organ Transit Tracker</h2>
+          <div class="subtitle">Green Corridor emergency routing to Apollo Central Hospital with real-time ETA countdown</div>
+        </div>
+        <button class="btn btn-primary" onclick="toggleTransitAnimation()">🚑 Start Organ Transport Simulation</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="mapDistance">18.4 km</div><div class="lbl">Distance to Hospital</div></div>
+        <div class="stat-card"><div class="num" id="mapEta" style="color:var(--cyan);">14 min</div><div class="lbl">Estimated Time of Arrival</div></div>
+        <div class="stat-card"><div class="num" id="mapSpeed">78 km/h</div><div class="lbl">Ambulance Speed</div></div>
+        <div class="stat-card"><div class="num" id="mapIschemia" style="color:var(--amber);">03h:42m</div><div class="lbl">Organ Viability Clock (Heart)</div></div>
+      </div>
+
+      <div class="card">
+        <h4>Live Navigation Map (Dark Night Corridor Theme)</h4>
+        <div id="transitMap"></div>
+      </div>
+    </div>
+
+    <!-- PATIENTS PANE -->
+    <div class="pane" id="pane-dr-patients">
+      <div class="card">
+        <h4>Recipient Patients List <button class="btn-outline-sm" onclick="toast('Patient intake form opened','cyan')">+ New Patient Record</button></h4>
+        <table>
+          <thead>
+            <tr><th>Patient ID</th><th>Full Name</th><th>Required Organ</th><th>Blood Group</th><th>Urgency</th><th>Priority Score</th><th>Waiting Time</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>PAT-8812</td><td>Meenakshi Verma</td><td>Liver</td><td>B+</td><td><span class="badge critical">CRITICAL</span></td><td>96.4</td><td>14 days</td></tr>
+            <tr><td>PAT-9034</td><td>Rahul Deshmukh</td><td>Kidney</td><td>O+</td><td><span class="badge medium">MEDIUM</span></td><td>72.1</td><td>62 days</td></tr>
+            <tr><td>PAT-9110</td><td>Fathima Nazreen</td><td>Heart</td><td>A-</td><td><span class="badge critical">CRITICAL</span></td><td>98.9</td><td>4 days</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EMERGENCY PANE -->
+    <div class="pane" id="pane-dr-emergency">
+      <div class="card">
+        <h4>Trigger ESP32 Hospital Emergency Alert</h4>
+        <p style="color:var(--muted); font-size:.85rem; margin-bottom:14px;">Broadcasting via WebSockets to all connected hospital OLED hardware displays and sirens on <code>Aravindh_Hotspot</code> / <code>Qtransplant123</code>.</p>
+        <div class="field">
+          <label>Emergency Requirement</label>
+          <input type="text" id="emergRequirementInput" value="CRITICAL HEART NEEDED - B+ Blood Group - Max 4h Viability Window">
+        </div>
+        <button class="btn btn-primary" onclick="triggerNetworkEmergency()">🚨 Broadcast Emergency Alert</button>
+      </div>
+    </div>
+
+  </main>
+</section>
+
+<!-- ================= DONOR PORTAL ================= -->
+<section class="screen" id="screen-donor">
+  <main class="main" style="max-width:800px; margin:0 auto;">
+    <div class="main-head"><h2>Donor Profile &amp; Medical Registration</h2></div>
+    <div class="card">
+      <h4>Personal &amp; Contact Details</h4>
+      <div class="field-row">
+        <div class="field"><label>Full Name</label><input value="Priya Ramanathan"></div>
+        <div class="field"><label>Blood Group</label><select><option>O+</option><option>A+</option><option>B+</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Organs Available</label><input value="Kidney, Liver (Partial)"></div>
+        <div class="field"><label>Phone</label><input value="+91 98765 43210"></div>
+      </div>
+      <button class="btn btn-cyan" onclick="toast('Profile saved successfully!','cyan')">Save Profile</button>
+    </div>
+  </main>
+</section>
+
+<!-- ================= HOSPITAL PORTAL ================= -->
+<section class="screen" id="screen-hospital">
+  <main class="main">
+    <div class="main-head"><h2>Apollo Central Hospital Dashboard</h2></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">12</div><div class="lbl">Associated Doctors</div></div>
+      <div class="stat-card"><div class="num">34</div><div class="lbl">Active Cases</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--cyan);">ONLINE</div><div class="lbl">ESP32 Device Status</div></div>
+    </div>
+  </main>
+</section>
+
+<!-- ================= ORGANIZER ADMIN PORTAL ================= -->
+<section class="screen" id="screen-organizer">
+  <main class="main">
+    <div class="main-head"><h2>Central Organizer Administrative Console</h2></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">1,000</div><div class="lbl">Registered Donors</div></div>
+      <div class="stat-card"><div class="num">41</div><div class="lbl">Approved Doctors</div></div>
+      <div class="stat-card"><div class="num">5</div><div class="lbl">Hospitals Network</div></div>
+    </div>
+  </main>
+</section>
+
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+// Mock 1,000 Donors Generator for frontend cache
+let ALL_DONORS = [];
+let currentPage = 1;
+const pageSize = 20;
+
+function generateDonorsData() {
+  const firstNames = ["Aravindh", "Priya", "Rahul", "Ananya", "Rajesh", "Lakshmi", "Suresh", "Fatima", "Vikram", "Kavita", "Arjun", "Deepika", "Karthik", "Sneha", "Aditya", "Meera"];
+  const lastNames = ["Kumar", "Sharma", "Verma", "Patel", "Gupta", "Nair", "Reddy", "Sheikh", "Malhotra", "Joshi", "Iyer", "Rao"];
+  const bloodGroups = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"];
+  const organs = ["Kidney", "Liver", "Heart", "Lung", "Pancreas", "Intestine"];
+  const cities = ["Chennai", "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Kolkata", "Kochi", "Pune"];
+  const hlaA = ["*01", "*02", "*03", "*11", "*24"];
+  const hlaB = ["*07", "*08", "*15", "*27", "*35"];
+  const hlaC = ["*01", "*03", "*04", "*06"];
+
+  for (let i = 1; i <= 1000; i++) {
+    const fn = firstNames[i % firstNames.length];
+    const ln = lastNames[(i * 3) % lastNames.length];
+    const bg = bloodGroups[(i * 7) % bloodGroups.length];
+    const org = organs[(i * 2) % organs.length];
+    const city = cities[(i * 5) % cities.length];
+    const hla = `A${hlaA[i%5]} B${hlaB[(i*2)%5]} C${hlaC[(i*3)%4]}`;
+
+    ALL_DONORS.push({
+      id: `DNR-${String(i).padStart(4, '0')}`,
+      name: `${fn} ${ln}`,
+      blood: bg,
+      organ: org,
+      hla: hla,
+      location: city,
+      viability: `${(i % 18) + 4}h remaining`,
+      status: "Available"
+    });
+  }
+}
+
+function renderDonorsTable(donorsList) {
+  const tbody = document.getElementById("donorsTableBody");
+  tbody.innerHTML = "";
+
+  const start = (currentPage - 1) * pageSize;
+  const end = Math.min(start + pageSize, donorsList.length);
+  const pageDonors = donorsList.slice(start, end);
+
+  if (pageDonors.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--muted); padding:20px;">No donors found matching criteria.</td></tr>`;
+    return;
+  }
+
+  pageDonors.forEach(d => {
+    tbody.innerHTML += `
+      <tr>
+        <td style="font-family:var(--mono); font-weight:600; color:var(--cyan);">${d.id}</td>
+        <td style="font-weight:600;">${d.name}</td>
+        <td><span class="badge approved">${d.blood}</span></td>
+        <td style="text-transform:capitalize;">${d.organ}</td>
+        <td style="font-family:var(--mono); font-size:.78rem; color:var(--violet);">${d.hla}</td>
+        <td>${d.location}</td>
+        <td style="font-family:var(--mono); color:var(--amber);">${d.viability}</td>
+        <td><span class="badge active">${d.status}</span></td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("paginationInfo").innerText = `Showing ${start + 1}-${end} of ${donorsList.length}`;
+}
+
+let filteredDonorsCache = [];
+
+function filterDonors() {
+  const search = document.getElementById("donorSearchInput").value.toLowerCase();
+  const blood = document.getElementById("donorBloodFilter").value;
+  const organ = document.getElementById("donorOrganFilter").value.toLowerCase();
+
+  filteredDonorsCache = ALL_DONORS.filter(d => {
+    const matchSearch = d.name.toLowerCase().includes(search) || d.id.toLowerCase().includes(search) || d.location.toLowerCase().includes(search);
+    const matchBlood = !blood || d.blood === blood;
+    const matchOrgan = !organ || d.organ.toLowerCase().includes(organ);
+    return matchSearch && matchBlood && matchOrgan;
+  });
+
+  currentPage = 1;
+  renderDonorsTable(filteredDonorsCache);
+}
+
+function changePage(dir) {
+  const maxPages = Math.ceil(filteredDonorsCache.length / pageSize);
+  currentPage += dir;
+  if (currentPage < 1) currentPage = 1;
+  if (currentPage > maxPages) currentPage = maxPages;
+  renderDonorsTable(filteredDonorsCache);
+}
+
+// Grover Simulation Logic
+let groverStep = 0;
+function runGroverSimulation() {
+  const graph = document.getElementById("amplitudeGraph");
+  graph.innerHTML = "";
+  
+  // Simulate 8 candidates bar graph
+  const n = 8;
+  const targetIdx = 3;
+  groverStep = (groverStep + 1) % 4;
+
+  let amplitudes = [];
+  let desc = "";
+
+  if (groverStep === 0) {
+    amplitudes = Array(n).fill(1 / Math.sqrt(n));
+    desc = "Iteration 0: Superposition State |ψ₀⟩ = 1/√8 = 0.353. All candidates have equal probability.";
+  } else if (groverStep === 1) {
+    amplitudes = Array(n).fill(1 / Math.sqrt(n));
+    amplitudes[targetIdx] = -1 / Math.sqrt(n);
+    desc = "Iteration 1 — Oracle Phase Inversion: Target candidate (State #3) phase flipped to -0.353.";
+  } else if (groverStep === 2) {
+    amplitudes = Array(n).fill(0.08);
+    amplitudes[targetIdx] = 0.88;
+    desc = "Iteration 1 — Diffusion Operator (2μ - α_i): Target candidate probability amplified to 77.4%!";
+  } else {
+    amplitudes = Array(n).fill(0.02);
+    amplitudes[targetIdx] = 0.99;
+    desc = "Iteration 2 — Optimal Convergence: Marked donor candidate probability amplified to 98.0%. Grover Search Complete!";
+  }
+
+  amplitudes.forEach((amp, idx) => {
+    const isTarget = idx === targetIdx;
+    const heightPercent = Math.min(100, Math.abs(amp) * 100 * 0.9);
+    graph.innerHTML += `
+      <div class="amp-bar-wrapper">
+        <div class="amp-bar ${isTarget ? 'target' : ''}" style="height:${heightPercent}%;"></div>
+        <div class="amp-label">#${idx}</div>
+      </div>
+    `;
+  });
+
+  document.getElementById("groverStepDesc").innerText = desc;
+  toast("Grover Step Executed", "cyan");
+}
+
+// Leaflet Transit Map Setup
+let leafletMap = null;
+let animMarker = null;
+
+function initTransitMap() {
+  if (leafletMap) return;
+  
+  // Center on Chennai hospital corridor
+  leafletMap = L.map('transitMap').setView([13.0827, 80.2707], 13);
+
+  // CartoDB Dark Matter Night Theme Tiles
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    maxZoom: 19
+  }).addTo(leafletMap);
+
+  // Hospital Node
+  const hospIcon = L.divIcon({
+    className: 'custom-hosp-icon',
+    html: '<div style="background:#EF4444; width:16px; height:16px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 12px #EF4444;"></div>'
+  });
+  L.marker([13.0827, 80.2707], {icon: hospIcon}).addTo(leafletMap).bindPopup("<b>Apollo Central Hospital</b><br>Transplant Destination").openPopup();
+
+  // Transport Route Polyline (Green Corridor)
+  const routePoints = [
+    [13.0400, 80.2100],
+    [13.0550, 80.2300],
+    [13.0700, 80.2500],
+    [13.0827, 80.2707]
+  ];
+
+  const greenCorridor = L.polyline(routePoints, {
+    color: '#2DD4BF',
+    weight: 5,
+    opacity: 0.9,
+    dashArray: '10, 10'
+  }).addTo(leafletMap);
+
+  // Ambulance Marker
+  const ambIcon = L.divIcon({
+    className: 'custom-amb-icon',
+    html: '<div style="background:#2DD4BF; width:20px; height:20px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 16px #2DD4BF;"></div>'
+  });
+  animMarker = L.marker(routePoints[0], {icon: ambIcon}).addTo(leafletMap);
+}
+
+let animInterval = null;
+function toggleTransitAnimation() {
+  if (animInterval) {
+    clearInterval(animInterval);
+    animInterval = null;
+    toast("Simulation Paused", "amber");
+    return;
+  }
+
+  const routePoints = [
+    [13.0400, 80.2100],
+    [13.0450, 80.2180],
+    [13.0520, 80.2260],
+    [13.0610, 80.2390],
+    [13.0700, 80.2520],
+    [13.0780, 80.2630],
+    [13.0827, 80.2707]
+  ];
+
+  let step = 0;
+  toast("Ambulance Green Corridor Activated", "cyan");
+
+  animInterval = setInterval(() => {
+    step = (step + 1) % routePoints.length;
+    animMarker.setLatLng(routePoints[step]);
+    
+    const remDist = ((routePoints.length - step) * 2.8).toFixed(1);
+    const remEta = Math.max(2, (routePoints.length - step) * 2);
+    
+    document.getElementById("mapDistance").innerText = `${remDist} km`;
+    document.getElementById("mapEta").innerText = `${remEta} min`;
+
+    if (step === routePoints.length - 1) {
+      clearInterval(animInterval);
+      animInterval = null;
+      toast("Organ Transport Arrived at Hospital!", "cyan");
+    }
+  }, 1200);
+}
+
+// Navigation & Roles
+function switchRole(role) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".role-pill").forEach(p => p.classList.remove("active"));
+  
+  document.getElementById(`screen-${role}`).classList.add("active");
+  event.target.classList.add("active");
+
+  if (role === 'doctor') {
+    initTransitMap();
+  }
+}
+
+function showPane(role, paneName, btnElem) {
+  document.querySelectorAll(`#screen-${role} .pane`).forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(`#screen-${role} .nav-item`).forEach(n => n.classList.remove("active"));
+  
+  document.getElementById(`pane-${role}-${paneName}`).classList.add("active");
+  if (btnElem) btnElem.classList.add("active");
+
+  if (paneName === 'map') {
+    setTimeout(initTransitMap, 200);
+  }
+}
+
+function triggerNetworkEmergency() {
+  const text = document.getElementById("emergRequirementInput").value;
+  toast(`🚨 EMERGENCY BROADCAST: ${text}`, "err");
+}
+
+function toast(msg, type="cyan") {
+  const stack = document.getElementById("toastStack");
+  const t = document.createElement("div");
+  t.className = `toast ${type === 'err' ? 'err' : (type === 'amber' ? 'warn' : '')}`;
+  t.innerHTML = `<div>${msg}</div>`;
+  stack.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// Init Benchmark Chart
+function initBenchmarkChart() {
+  const ctx = document.getElementById('benchmarkChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['N=10', 'N=100', 'N=500', 'N=1000'],
+      datasets: [
+        {
+          label: 'Classical Search Evaluations O(N)',
+          data: [10, 100, 500, 1000],
+          borderColor: '#EF4444',
+          tension: 0.2
+        },
+        {
+          label: 'Quantum Grover Search Evaluations O(√N)',
+          data: [3, 10, 22, 31],
+          borderColor: '#2DD4BF',
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,42,68,0.5)' } },
+        x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,42,68,0.5)' } }
+      },
+      plugins: {
+        legend: { labels: { color: '#E8EDF2' } }
+      }
+    }
+  });
+}
+
+// Window load init
+window.addEventListener("load", () => {
+  generateDonorsData();
+  filteredDonorsCache = ALL_DONORS;
+  renderDonorsTable(filteredDonorsCache);
+  runGroverSimulation();
+  initBenchmarkChart();
+  setTimeout(initTransitMap, 300);
+});
+</script>
+
+</body>
+</html>

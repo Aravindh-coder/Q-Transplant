@@ -1,0 +1,9 @@
+.env
+*.db
+uploads/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+venv/
+backend_extracted/

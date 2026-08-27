@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q-Transplant — Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --void:#070B14; --panel:#0F1729; --panel-2:#141F38; --panel-3:#0A0F1C;
+  --line: rgba(30,42,68,0.9); --line-soft: rgba(30,42,68,0.5);
+  --red:#EF4444; --red-dim: rgba(239,68,68,0.15);
+  --cyan:#2DD4BF; --cyan-dim: rgba(45,212,191,0.14);
+  --amber:#F5A524; --amber-dim: rgba(245,165,36,0.14);
+  --violet:#A78BFA; --violet-dim: rgba(167,139,250,0.15);
+  --text:#E8EDF2; --muted:#64748B; --muted-2:#4A5A70;
+  --mono:'JetBrains Mono',monospace; --disp:'Space Grotesk',sans-serif; --body:'Inter',sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{background:var(--void); color:var(--text); font-family:var(--body); overflow:hidden;
+  background-image:
+    linear-gradient(rgba(45,212,191,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45,212,191,0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important; transition-duration:.001ms !important;}}
+button, input, textarea, select{font-family:inherit; color:inherit;}
+::selection{background:var(--red); color:#fff;}
+::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
+
+#bgCanvas{position:fixed; inset:0; z-index:0; transition:opacity .6s ease;}
+.scrim{position:fixed; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at 50% 30%, rgba(7,11,20,0.25), rgba(7,11,20,0.88) 72%);}
+body.dashboard-mode .scrim{background:radial-gradient(ellipse at 85% -10%, rgba(7,11,20,0.4), rgba(7,11,20,0.96) 55%);}
+
+#app{position:relative; z-index:2; height:100vh; overflow-y:auto; overflow-x:hidden;}
+
+/* ---------- shared bits ---------- */
+.screen{display:none; min-height:100vh;}
+.screen.active{display:block; animation:fadeIn .5s ease;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+.center-wrap{min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:100px 20px 60px;}
+.brandmark{display:flex; align-items:center; gap:9px; font-family:var(--disp); font-weight:700; letter-spacing:.02em; position:fixed; top:24px; left:28px; z-index:20; font-size:.98rem;}
+.brandmark .dot{width:8px;height:8px;border-radius:50%;background:var(--red); box-shadow:0 0 10px 2px var(--red); animation:beat 1.1s ease-in-out infinite;}
+@keyframes beat{0%,100%{transform:scale(1);}45%{transform:scale(1.5);}}
+.eyebrow{font-family:var(--mono); font-size:.7rem; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); margin-bottom:14px;}
+h1.big{font-family:var(--disp); font-weight:700; font-size:clamp(1.9rem,4.4vw,3rem); letter-spacing:-.02em; margin-bottom:14px; text-align:center;}
+.sub{color:var(--muted); text-align:center; max-width:520px; font-size:.95rem; line-height:1.6; margin-bottom:44px;}
+.glass{background:rgba(13,19,27,0.72); backdrop-filter:blur(18px); border:1px solid var(--line); border-radius:16px;}
+.link-btn{background:none; border:none; color:var(--cyan); font-size:.82rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px;}
+.link-btn.muted{color:var(--muted);}
+.field{margin-bottom:14px; text-align:left;}
+.field label{display:block; font-size:.72rem; font-family:var(--mono); color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;}
+.field input, .field select, .field textarea{
+  width:100%; background:var(--panel-3); border:1px solid var(--line); border-radius:9px; padding:11px 13px;
+  color:var(--text); font-size:.88rem; transition:border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--cyan);}
+.field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.btn{font-weight:600; font-size:.87rem; padding:13px 22px; border-radius:9px; border:none; cursor:pointer; transition:transform .12s, box-shadow .15s; display:inline-flex; align-items:center; justify-content:center; gap:8px;}
+.btn:active{transform:scale(.97);}
+.btn-block{width:100%;}
+.btn-primary{background:var(--red); color:#fff;}
+.btn-primary:hover{box-shadow:0 6px 22px -4px rgba(255,59,71,.55);}
+.btn-cyan{background:var(--cyan); color:#00110d;}
+.btn-cyan:hover{box-shadow:0 6px 22px -4px rgba(45,225,194,.5);}
+.btn-ghost{background:transparent; border:1px solid var(--line); color:var(--text);}
+.btn-ghost:hover{border-color:var(--text);}
+.btn-outline-sm{background:transparent; border:1px solid var(--line); color:var(--text); font-size:.76rem; padding:8px 14px; border-radius:7px; cursor:pointer;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.toast-stack{position:fixed; bottom:22px; right:22px; z-index:50; display:flex; flex-direction:column; gap:10px;}
+.toast{background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--cyan); padding:13px 18px; border-radius:10px; font-size:.82rem; max-width:320px; animation:toastIn .3s ease; box-shadow:0 10px 30px rgba(0,0,0,.4);}
+.toast.warn{border-left-color:var(--amber);}
+.toast.err{border-left-color:var(--red);}
+@keyframes toastIn{from{opacity:0; transform:translateX(20px);} to{opacity:1; transform:none;}}
+
+/* ---------- ROLE SELECT ---------- */
+.role-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; max-width:920px; width:100%;}
+.role-card{
+  padding:30px 22px; text-align:left; cursor:pointer; transition:transform .18s, border-color .18s;
+  display:flex; flex-direction:column; gap:14px;
+}
+.role-card:hover{transform:translateY(-4px); border-color:var(--accent,var(--cyan));}
+.role-card svg{width:30px; height:30px; stroke:var(--accent,var(--cyan));}
+.role-card h3{font-family:var(--disp); font-size:1.05rem; font-weight:600;}
+.role-card p{font-size:.78rem; color:var(--muted); line-height:1.5;}
+.role-card[data-role="donor"]{--accent:var(--cyan);}
+.role-card[data-role="doctor"]{--accent:var(--red);}
+.role-card[data-role="hospital"]{--accent:var(--amber);}
+.role-card[data-role="organizer"]{--accent:var(--violet);}
+@media(max-width:840px){.role-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:520px){.role-grid{grid-template-columns:1fr;}}
+
+/* ---------- AUTH ---------- */
+.auth-box{width:100%; max-width:420px; padding:36px 34px;}
+.role-chip{display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:.72rem; color:var(--muted); margin-bottom:20px; padding:6px 12px; border:1px solid var(--line); border-radius:100px;}
+.role-chip button{background:none;border:none;color:var(--cyan);cursor:pointer;font-size:.72rem;text-decoration:underline;}
+.tabbar{display:flex; gap:6px; margin-bottom:24px; background:var(--panel-3); padding:4px; border-radius:9px;}
+.tabbar button{flex:1; padding:9px; border:none; background:none; border-radius:7px; font-size:.82rem; font-weight:600; color:var(--muted); cursor:pointer; transition:all .15s;}
+.tabbar button.active{background:var(--panel-2); color:var(--text);}
+.auth-panel{display:none;} .auth-panel.active{display:block;}
+.approval-note{font-size:.74rem; color:var(--muted); background:var(--panel-3); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:14px; line-height:1.5;}
+.otp-boxes{display:flex; gap:8px; justify-content:center; margin:18px 0;}
+.otp-boxes input{width:44px; height:52px; text-align:center; font-size:1.2rem; font-family:var(--mono); background:var(--panel-3); border:1px solid var(--line); border-radius:9px;}
+.otp-boxes input:focus{outline:none; border-color:var(--cyan);}
+.demo-banner{background:var(--amber-dim); border:1px solid var(--amber); border-radius:9px; padding:11px 13px; font-family:var(--mono); font-size:.72rem; color:var(--amber); margin-bottom:16px; line-height:1.6;}
+
+/* ---------- DASHBOARD SHELL ---------- */
+.dash{display:none; min-height:100vh;}
+.dash.active{display:flex;}
+.sidebar{width:230px; flex-shrink:0; border-right:1px solid var(--line); padding:26px 18px; display:flex; flex-direction:column; background:rgba(10,15,22,0.65); backdrop-filter:blur(20px);}
+.side-brand{font-family:var(--disp); font-weight:700; font-size:.92rem; margin-bottom:6px; padding:0 8px;}
+.side-role{font-family:var(--mono); font-size:.66rem; color:var(--accent); text-transform:uppercase; letter-spacing:.1em; padding:0 8px; margin-bottom:26px;}
+.nav-item{
+  display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:.83rem; color:var(--muted);
+  cursor:pointer; margin-bottom:2px; transition:all .15s; border:none; background:none; width:100%; text-align:left;
+}
+.nav-item:hover{background:var(--line-soft); color:var(--text);}
+.nav-item.active{background:var(--panel-2); color:var(--text); box-shadow:inset 2px 0 0 var(--accent);}
+.sidebar-foot{margin-top:auto; padding-top:16px; border-top:1px solid var(--line);}
+.user-chip{display:flex; align-items:center; gap:10px; padding:8px; font-size:.78rem;}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent); display:flex;align-items:center;justify-content:center; font-family:var(--disp); font-weight:700; font-size:.8rem; color:#00110d;}
+.signout{margin-top:8px; width:100%; text-align:left; background:none; border:none; color:var(--muted); font-size:.76rem; cursor:pointer; padding:8px;}
+.signout:hover{color:var(--red);}
+
+.main{flex:1; padding:30px 38px 60px; overflow-y:auto; max-height:100vh;}
+.main-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:10px;}
+.main-head h2{font-family:var(--disp); font-size:1.5rem; font-weight:600;}
+.main-head .subtitle{color:var(--muted); font-size:.83rem; margin-top:4px;}
+.pane{display:none;} .pane.active{display:block; animation:fadeIn .35s ease;}
+
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:30px;}
+.stat-card{padding:18px 20px; border-radius:12px;}
+.stat-card .num{font-family:var(--disp); font-size:1.7rem; font-weight:700;}
+.stat-card .lbl{font-family:var(--mono); font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:4px;}
+
+.card{padding:22px 24px; border-radius:14px; margin-bottom:20px;}
+.card h4{font-family:var(--disp); font-size:1rem; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between;}
+.card h4 .btn-outline-sm{font-weight:500;}
+
+table{width:100%; border-collapse:collapse; font-size:.82rem;}
+th{text-align:left; font-family:var(--mono); font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:9px 10px; border-bottom:1px solid var(--line);}
+td{padding:11px 10px; border-bottom:1px solid var(--line-soft);}
+tr:last-child td{border-bottom:none;}
+.badge{font-family:var(--mono); font-size:.62rem; padding:3px 9px; border-radius:100px; text-transform:uppercase; letter-spacing:.04em;}
+.badge.pending{background:var(--amber-dim); color:var(--amber);}
+.badge.approved{background:var(--cyan-dim); color:var(--cyan);}
+.badge.rejected{background:var(--red-dim); color:var(--red);}
+.badge.active{background:var(--cyan-dim); color:var(--cyan);}
+.badge.inactive{background:rgba(255,255,255,.06); color:var(--muted);}
+.badge.critical{background:var(--red-dim); color:var(--red);}
+.badge.medium{background:var(--amber-dim); color:var(--amber);}
+.badge.low{background:rgba(255,255,255,.06); color:var(--muted);}
+.row-actions{display:flex; gap:6px;}
+.row-actions button{font-size:.7rem; padding:5px 10px; border-radius:6px; border:1px solid var(--line); background:none; color:var(--text); cursor:pointer;}
+.row-actions button.approve{border-color:var(--cyan); color:var(--cyan);}
+.row-actions button.approve:hover{background:var(--cyan); color:#00110d;}
+.row-actions button.reject{border-color:var(--red); color:var(--red);}
+.row-actions button.reject:hover{background:var(--red); color:#fff;}
+
+.stepper{display:flex; align-items:center; margin:14px 0 4px; flex-wrap:wrap; gap:0;}
+.step{font-family:var(--mono); font-size:.62rem; padding:5px 10px; border-radius:100px; background:var(--panel-3); color:var(--muted-2); border:1px solid var(--line); white-space:nowrap;}
+.step.done{color:var(--cyan); border-color:var(--cyan);}
+.step.now{color:var(--void); background:var(--cyan); border-color:var(--cyan);}
+.step-sep{width:14px; height:1px; background:var(--line); flex-shrink:0;}
+
+.explain-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px;}
+.explain-item{background:var(--panel-3); border:1px solid var(--line); border-radius:9px; padding:10px 12px; text-align:center;}
+.explain-item .v{font-family:var(--disp); font-weight:700; font-size:1.05rem;}
+.explain-item .k{font-family:var(--mono); font-size:.6rem; color:var(--muted); text-transform:uppercase; margin-top:2px;}
+.explain-item.pass .v{color:var(--cyan);}
+.explain-item.fail .v{color:var(--red);}
+
+.oled{background:#01120b; border:2px solid #1c3a2c; border-radius:5px; padding:10px 12px; font-family:var(--mono); font-size:.68rem; color:#39ff9a; line-height:1.55; white-space:pre-wrap; min-height:64px; box-shadow:inset 0 0 14px rgba(57,255,154,.15);}
+.cursor{opacity:.6; animation:blink 1s step-end infinite;} @keyframes blink{50%{opacity:0;}}
+#alertBanner2{display:none; margin-bottom:16px; padding:15px 18px; border-radius:10px; background:var(--red-dim); border:1px solid var(--red); font-family:var(--mono); font-size:.8rem; animation:bp 1.4s ease-in-out infinite;}
+#alertBanner2.donorfound{background:var(--cyan-dim); border-color:var(--cyan); animation:none;}
+@keyframes bp{0%,100%{box-shadow:0 0 0 0 rgba(255,59,71,.35);}50%{box-shadow:0 0 0 8px rgba(255,59,71,0);}}
+.hgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;}
+.hcard{background:var(--panel-3); border:1px solid var(--line); border-radius:11px; padding:15px;}
+.hcard.state-emergency{border-color:var(--red);}
+.hcard.state-donorfound{border-color:var(--cyan);}
+.hcard-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;}
+.hcard-top b{font-size:.86rem; font-family:var(--disp);}
+.hcard .city{font-size:.68rem; color:var(--muted); margin-bottom:9px;}
+.req-input{width:100%; background:var(--void); border:1px solid var(--line); border-radius:7px; font-size:.72rem; padding:7px 9px; margin:8px 0; resize:none;}
+.mini-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.mini-btn{flex:1; min-width:70px; font-size:.68rem; font-weight:600; padding:7px 6px; border-radius:6px; border:1px solid var(--line); background:none; color:var(--text); cursor:pointer;}
+.mini-btn.emerg{border-color:var(--red); color:var(--red);} .mini-btn.emerg:hover{background:var(--red); color:#fff;}
+.mini-btn.donor{border-color:var(--cyan); color:var(--cyan);} .mini-btn.donor:hover{background:var(--cyan); color:#00110d;}
+.mini-btn.ack{border-color:var(--amber); color:var(--amber);} .mini-btn.ack:hover{background:var(--amber); color:#231400;}
+.mini-btn:disabled{opacity:.3; cursor:not-allowed;}
+
+.notif-item{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--line-soft);}
+.notif-item:last-child{border-bottom:none;}
+.notif-dot{width:7px;height:7px;border-radius:50%;background:var(--cyan); margin-top:6px; flex-shrink:0;}
+.notif-item.unread .notif-dot{background:var(--red);}
+.notif-item .t{font-size:.7rem; color:var(--muted-2); font-family:var(--mono);}
+
+.audit-log{font-family:var(--mono); font-size:.72rem; line-height:2; max-height:340px; overflow-y:auto;}
+.audit-log .a-time{color:var(--muted-2); margin-right:10px;}
+.audit-log .a-action{color:var(--cyan); margin-right:8px;}
+
+.toggle{position:relative; width:44px; height:24px; background:var(--panel-3); border:1px solid var(--line); border-radius:100px; cursor:pointer; flex-shrink:0;}
+.toggle .knob{position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--muted); transition:all .2s;}
+.toggle.on{background:var(--cyan-dim); border-color:var(--cyan);}
+.toggle.on .knob{left:22px; background:var(--cyan);}
+
+.two-col{display:grid; grid-template-columns:1.3fr 1fr; gap:20px;}
+@media(max-width:980px){.two-col{grid-template-columns:1fr;} .sidebar{display:none;} .explain-grid{grid-template-columns:repeat(2,1fr);}}
+
+.doc-list{display:flex; flex-direction:column; gap:8px;}
+.doc-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel-3); border:1px solid var(--line); border-radius:8px; padding:10px 13px; font-size:.8rem;}
+.upload-drop{border:1.5px dashed var(--line); border-radius:10px; padding:22px; text-align:center; color:var(--muted); font-size:.8rem; cursor:pointer; margin-bottom:14px;}
+.upload-drop:hover{border-color:var(--cyan); color:var(--text);}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="scrim"></div>
+<div class="brandmark"><span class="dot"></span> Q-TRANSPLANT</div>
+<div class="toast-stack" id="toasts"></div>
+
+<div id="app">
+
+<!-- ================= ROLE SELECT ================= -->
+<section class="screen active" id="screen-role">
+  <div class="center-wrap">
+    <span class="eyebrow">Choose your access level</span>
+    <h1 class="big">Who's signing in?</h1>
+    <p class="sub">Each portal is scoped to exactly what that role needs — donors never see hospital data, doctors wait on organizer approval before touching a single record.</p>
+    <div class="role-grid">
+      <div class="role-card glass" data-role="donor">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.2 4.5 5.8 4c2-.3 3.7.7 4.9 2.2C11.9 4.7 13.6 3.7 15.6 4c3.6.5 5.4 4.1 3.8 7.7C16.9 16.4 12 21 12 21z"/><path d="M4 12h3l1.6-3 2.4 6 1.6-4h4"/></svg>
+        <h3>Donor</h3><p>Register your profile, manage organ availability, track status.</p>
+      </div>
+      <div class="role-card glass" data-role="doctor">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><circle cx="12" cy="7" r="3.2"/><path d="M5 21v-2a7 7 0 0114 0v2"/><path d="M9 12v3M9 13.5h0"/></svg>
+        <h3>Doctor</h3><p>Search candidates, run matching, escalate emergencies.</p>
+      </div>
+      <div class="role-card glass" data-role="hospital">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6"/><path d="M12 8v4M10 10h4"/></svg>
+        <h3>Hospital</h3><p>Coordinate doctors, cases, and the ESP32 emergency mesh.</p>
+      </div>
+      <div class="role-card glass" data-role="organizer">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        <h3>Organizer</h3><p>Approve doctors, monitor the network, own the audit trail.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AUTH ================= -->
+<section class="screen" id="screen-auth">
+  <div class="center-wrap">
+    <div class="auth-box glass">
+      <div class="role-chip"><span id="authRoleLabel">Donor</span> · <button onclick="goRole()">change role</button></div>
+
+      <div class="tabbar" id="authTabs">
+        <button class="active" data-tab="login" onclick="switchAuthTab('login')">Log in</button>
+        <button data-tab="register" onclick="switchAuthTab('register')">Register</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div class="auth-panel active" id="panel-login">
+        <div class="field"><label>Email</label><input type="email" id="loginEmail" placeholder="you@hospital.org" value="demo@qtransplant.dev"></div>
+        <div class="field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" value="demo1234"></div>
+        <button class="btn btn-primary btn-block" onclick="doLogin()">Log in</button>
+        <div style="text-align:center; margin-top:14px;"><button class="link-btn muted" onclick="switchAuthTab('forgot')">Forgot password?</button></div>
+        <div class="approval-note" id="loginNote"></div>
+      </div>
+
+      <!-- REGISTER -->
+      <div class="auth-panel" id="panel-register">
+        <div id="registerFields"></div>
+        <button class="btn btn-cyan btn-block" onclick="doRegister()">Create account</button>
+        <div class="approval-note" id="registerNote"></div>
+      </div>
+
+      <!-- FORGOT PASSWORD / OTP -->
+      <div class="auth-panel" id="panel-forgot">
+        <div id="forgotStep1">
+          <p class="sub" style="margin-bottom:18px; text-align:left; font-size:.83rem;">Enter your registered email. An OTP will be sent from the organizer's mailbox, <b style="color:var(--text)">aravindhjoshua10@gmail.com</b>.</p>
+          <div class="field"><label>Registered email</label><input type="email" id="forgotEmail" placeholder="you@hospital.org"></div>
+          <button class="btn btn-primary btn-block" onclick="sendOtp()">Send OTP</button>
+        </div>
+        <div id="forgotStep2" style="display:none;">
+          <div class="demo-banner" id="demoOtpBanner"></div>
+          <p class="sub" style="margin-bottom:6px; text-align:left; font-size:.83rem;">Enter the 6-digit code.</p>
+          <div class="otp-boxes">
+            <input maxlength="1" class="otpd"><input maxlength="1" class="otpd"><input maxlength="1" class="otpd">
+            <input maxlength="1" class="otpd"><input maxlength="1" class="otpd"><input maxlength="1" class="otpd">
+          </div>
+          <div class="field"><label>New password</label><input type="password" id="newPassword" placeholder="At least 8 characters"></div>
+          <button class="btn btn-cyan btn-block" onclick="resetPassword()">Reset password</button>
+        </div>
+        <div style="text-align:center; margin-top:14px;"><button class="link-btn muted" onclick="switchAuthTab('login')">Back to login</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DONOR DASHBOARD ================= -->
+<section class="dash" id="dash-donor" style="--accent:var(--cyan);">
+  <aside class="sidebar">
+    <div class="side-brand">Q-TRANSPLANT</div>
+    <div class="side-role">Donor Portal</div>
+    <button class="nav-item active" data-pane="d-overview">Overview</button>
+    <button class="nav-item" data-pane="d-profile">Profile</button>
+    <button class="nav-item" data-pane="d-status">Donation status</button>
+    <button class="nav-item" data-pane="d-docs">Documents</button>
+    <button class="nav-item" data-pane="d-notif">Notifications</button>
+    <div class="sidebar-foot">
+      <div class="user-chip"><div class="user-avatar">D</div><div><div style="font-weight:600;">Priya R.</div><div style="color:var(--muted); font-size:.7rem;">Donor</div></div></div>
+      <button class="signout" onclick="signOut()">Sign out</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="main-head"><div><h2>Welcome back, Priya</h2><div class="subtitle">Your donor profile is visible only to approved medical staff running an active match request.</div></div></div>
+
+    <div class="pane active" id="pane-d-overview">
+      <div class="stat-grid">
+        <div class="stat-card glass"><div class="num" style="color:var(--cyan);">Active</div><div class="lbl">Donation status</div></div>
+        <div class="stat-card glass"><div class="num">O+</div><div class="lbl">Blood group</div></div>
+        <div class="stat-card glass"><div class="num">2</div><div class="lbl">Organs listed</div></div>
+        <div class="stat-card glass"><div class="num">0</div><div class="lbl">Pending requests</div></div>
+      </div>
+      <div class="card glass"><h4>Recent activity</h4>
+        <div class="notif-item"><div class="notif-dot"></div><div><div>Profile verified by MIOT International</div><div class="t">3 days ago</div></div></div>
+        <div class="notif-item"><div class="notif-dot"></div><div><div>Medical document accepted</div><div class="t">6 days ago</div></div></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-d-profile">
+      <div class="card glass"><h4>Your details</h4>
+        <div class="field-row">
+          <div class="field"><label>Full name</label><input value="Priya Ramanathan"></div>
+          <div class="field"><label>Date of birth</label><input type="date" value="1996-04-12"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Blood group</label><select><option>O+</option><option>A+</option><option>B+</option><option>AB+</option></select></div>
+          <div class="field"><label>Phone</label><input value="+91 98xxxxxx21"></div>
+        </div>
+        <div class="field"><label>Address</label><input value="Ayapakkam, Chennai, TN"></div>
+        <button class="btn btn-cyan" onclick="toast('Profile updated','cyan')">Save changes</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-d-status">
+      <div class="card glass"><h4>Organs available for donation</h4>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; align-items:center; gap:12px;"><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div> Kidney</div>
+          <div style="display:flex; align-items:center; gap:12px;"><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div> Liver (partial)</div>
+          <div style="display:flex; align-items:center; gap:12px;"><div class="toggle" onclick="this.classList.toggle('on')"><div class="knob"></div></div> Cornea</div>
+        </div>
+      </div>
+      <div class="card glass"><h4>Overall availability</h4>
+        <p style="color:var(--muted); font-size:.85rem; margin-bottom:14px;">Turning this off hides your profile from every new match search immediately. Existing in-progress cases are unaffected.</p>
+        <div style="display:flex; align-items:center; gap:12px;"><div class="toggle on" onclick="this.classList.toggle('on'); toast('Donation status updated','cyan')"><div class="knob"></div></div> Actively available for matching</div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-d-docs">
+      <div class="card glass"><h4>Medical documents</h4>
+        <div class="upload-drop" onclick="toast('File picker would open here','cyan')">Drop a file or click to upload — PDF, JPG up to 10MB</div>
+        <div class="doc-list">
+          <div class="doc-row"><span>blood_report_2026.pdf</span><span class="badge approved">Verified</span></div>
+          <div class="doc-row"><span>id_proof.jpg</span><span class="badge approved">Verified</span></div>
+          <div class="doc-row"><span>hla_typing.pdf</span><span class="badge pending">Under review</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-d-notif">
+      <div class="card glass"><h4>Notifications</h4>
+        <div class="notif-item unread"><div class="notif-dot"></div><div><div>Your HLA typing document is under review</div><div class="t">Today, 9:12 AM</div></div></div>
+        <div class="notif-item"><div class="notif-dot"></div><div><div>Rainbow Multispeciality accepted your profile as a candidate pool entry</div><div class="t">2 days ago</div></div></div>
+        <div class="notif-item"><div class="notif-dot"></div><div><div>Welcome to Q-Transplant — verify your email to finish onboarding</div><div class="t">6 days ago</div></div></div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ================= DOCTOR DASHBOARD ================= -->
+<section class="dash" id="dash-doctor" style="--accent:var(--red);">
+  <aside class="sidebar">
+    <div class="side-brand">Q-TRANSPLANT</div>
+    <div class="side-role">Doctor Portal</div>
+    <button class="nav-item active" data-pane="dr-overview">Overview</button>
+    <button class="nav-item" data-pane="dr-patients">Patients</button>
+    <button class="nav-item" data-pane="dr-donors">Donor search</button>
+    <button class="nav-item" data-pane="dr-matching">Matching engine</button>
+    <button class="nav-item" data-pane="dr-emergency">Emergency</button>
+    <button class="nav-item" data-pane="dr-profile">Profile &amp; license</button>
+    <div class="sidebar-foot">
+      <div class="user-chip"><div class="user-avatar">S</div><div><div style="font-weight:600;">Dr. Suresh K.</div><div style="color:var(--muted); font-size:.7rem;">Cardiothoracic</div></div></div>
+      <button class="signout" onclick="signOut()">Sign out</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="main-head"><div><h2>Dr. Suresh's dashboard</h2><div class="subtitle">Apollo Central · Approved doctor</div></div>
+      <span class="badge approved">Approved</span>
+    </div>
+
+    <div class="pane active" id="pane-dr-overview">
+      <div class="stat-grid">
+        <div class="stat-card glass"><div class="num">14</div><div class="lbl">Active patients</div></div>
+        <div class="stat-card glass"><div class="num">3</div><div class="lbl">Match requests open</div></div>
+        <div class="stat-card glass"><div class="num" style="color:var(--red);">1</div><div class="lbl">Critical cases</div></div>
+        <div class="stat-card glass"><div class="num">228</div><div class="lbl">Donor pool visible</div></div>
+      </div>
+      <div class="card glass"><h4>Case pipeline — Meenakshi V. (Liver, Critical)</h4>
+        <div class="stepper">
+          <span class="step done">Created</span><div class="step-sep"></div>
+          <span class="step done">Medical review</span><div class="step-sep"></div>
+          <span class="step now">Match search</span><div class="step-sep"></div>
+          <span class="step">Candidate found</span><div class="step-sep"></div>
+          <span class="step">Doctor review</span><div class="step-sep"></div>
+          <span class="step">Hospital coordination</span><div class="step-sep"></div>
+          <span class="step">Scheduled</span><div class="step-sep"></div>
+          <span class="step">Completed</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-dr-patients">
+      <div class="card glass"><h4>Your patients <button class="btn-outline-sm" onclick="toast('New patient form would open','red')">+ Add patient</button></h4>
+        <table><thead><tr><th>Name</th><th>Organ needed</th><th>Blood group</th><th>Urgency</th><th>Waiting since</th></tr></thead>
+        <tbody>
+          <tr><td>Meenakshi V.</td><td>Liver</td><td>B+</td><td><span class="badge critical">Critical</span></td><td>14 days</td></tr>
+          <tr><td>Rahul D.</td><td>Kidney</td><td>O+</td><td><span class="badge medium">Medium</span></td><td>62 days</td></tr>
+          <tr><td>Fathima N.</td><td>Cornea</td><td>A-</td><td><span class="badge low">Low</span></td><td>9 days</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-dr-donors">
+      <div class="card glass"><h4>Search donor pool</h4>
+        <div class="field-row">
+          <div class="field"><label>Organ</label><select><option>Liver</option><option>Kidney</option><option>Heart</option></select></div>
+          <div class="field"><label>Blood group</label><select><option>Any</option><option>O+</option><option>B+</option></select></div>
+        </div>
+        <table><thead><tr><th>Donor ID</th><th>Blood group</th><th>Organ</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>DNR-0231</td><td>B+</td><td>Liver (partial)</td><td><span class="badge active">Available</span></td></tr>
+          <tr><td>DNR-0198</td><td>B+</td><td>Liver</td><td><span class="badge active">Available</span></td></tr>
+          <tr><td>DNR-0304</td><td>B+</td><td>Liver</td><td><span class="badge inactive">Unavailable</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-dr-matching">
+      <div class="card glass"><h4>Run match — Meenakshi V. (Liver, Critical)
+        <button class="btn-outline-sm" onclick="runMatch()">Run matching engine</button></h4>
+        <div id="matchResults" style="color:var(--muted); font-size:.85rem;">No match run yet this session.</div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-dr-emergency">
+      <div class="card glass"><h4>Trigger a hospital emergency</h4>
+        <p style="color:var(--muted); font-size:.84rem; margin-bottom:14px;">This raises the alert for Apollo Central across the whole network — every hospital's dashboard and physical ESP32 device.</p>
+        <div class="field"><label>Requirement</label><textarea class="req-input" style="margin:0 0 12px;" rows="2" id="drEmergReq" placeholder="e.g. B+ liver, critical, 6hr window"></textarea></div>
+        <button class="btn btn-primary" onclick="doctorTriggerEmergency()">🚨 Trigger emergency for Apollo Central</button>
+      </div>
+      <div class="card glass"><h4>Network status</h4><div id="drNetworkMini"></div></div>
+    </div>
+
+    <div class="pane" id="pane-dr-profile">
+      <div class="card glass"><h4>License &amp; certification</h4>
+        <div class="field-row">
+          <div class="field"><label>Full name</label><input value="Dr. Suresh Kumaraswamy"></div>
+          <div class="field"><label>License number</label><input value="TN-MED-88213"></div>
+        </div>
+        <div class="doc-list">
+          <div class="doc-row"><span>Medical license</span><span class="badge approved">Verified by organizer</span></div>
+          <div class="doc-row"><span>Certification photo</span><span class="badge approved">Verified by organizer</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ================= HOSPITAL DASHBOARD ================= -->
+<section class="dash" id="dash-hospital" style="--accent:var(--amber);">
+  <aside class="sidebar">
+    <div class="side-brand">Q-TRANSPLANT</div>
+    <div class="side-role">Hospital Portal</div>
+    <button class="nav-item active" data-pane="h-overview">Overview</button>
+    <button class="nav-item" data-pane="h-doctors">Doctors</button>
+    <button class="nav-item" data-pane="h-cases">Cases</button>
+    <button class="nav-item" data-pane="h-emergency">Emergency network</button>
+    <button class="nav-item" data-pane="h-devices">Devices</button>
+    <button class="nav-item" data-pane="h-profile">Hospital profile</button>
+    <div class="sidebar-foot">
+      <div class="user-chip"><div class="user-avatar">A</div><div><div style="font-weight:600;">Apollo Central</div><div style="color:var(--muted); font-size:.7rem;">Coordinator</div></div></div>
+      <button class="signout" onclick="signOut()">Sign out</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="main-head"><div><h2>Apollo Central</h2><div class="subtitle">12 doctors · 34 active cases · 1 device online</div></div></div>
+
+    <div class="pane active" id="pane-h-overview">
+      <div class="stat-grid">
+        <div class="stat-card glass"><div class="num">12</div><div class="lbl">Doctors</div></div>
+        <div class="stat-card glass"><div class="num">34</div><div class="lbl">Active cases</div></div>
+        <div class="stat-card glass"><div class="num">7</div><div class="lbl">Donors linked</div></div>
+        <div class="stat-card glass"><div class="num" style="color:var(--cyan);">Online</div><div class="lbl">ESP32 device</div></div>
+      </div>
+      <div class="card glass"><h4>Recent hospital activity</h4>
+        <div class="notif-item"><div class="notif-dot"></div><div><div>Dr. Suresh K. requested a match for Meenakshi V.</div><div class="t">21 min ago</div></div></div>
+        <div class="notif-item"><div class="notif-dot"></div><div><div>New doctor registration pending organizer approval</div><div class="t">1 hr ago</div></div></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-h-doctors">
+      <div class="card glass"><h4>Doctors at this hospital <button class="btn-outline-sm" onclick="toast('Invite link generated','amber')">+ Invite doctor</button></h4>
+        <table><thead><tr><th>Name</th><th>Specialty</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Dr. Suresh K.</td><td>Cardiothoracic</td><td><span class="badge approved">Approved</span></td></tr>
+          <tr><td>Dr. Nandhini R.</td><td>Nephrology</td><td><span class="badge approved">Approved</span></td></tr>
+          <tr><td>Dr. Vikram S.</td><td>Hepatology</td><td><span class="badge pending">Pending organizer review</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-h-cases">
+      <div class="card glass"><h4>Transplant cases</h4>
+        <table><thead><tr><th>Patient</th><th>Organ</th><th>Stage</th></tr></thead>
+        <tbody>
+          <tr><td>Meenakshi V.</td><td>Liver</td><td><span class="badge medium">Match search</span></td></tr>
+          <tr><td>Rahul D.</td><td>Kidney</td><td><span class="badge low">Doctor review</span></td></tr>
+          <tr><td>Anitha M.</td><td>Heart</td><td><span class="badge critical">Hospital coordination</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-h-emergency">
+      <div class="card glass">
+        <h4>Live emergency network</h4>
+        <div id="alertBanner2"></div>
+        <div id="hospGrid2" class="hgrid"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-h-devices">
+      <div class="card glass"><h4>ESP32 devices</h4>
+        <table><thead><tr><th>Device ID</th><th>Location</th><th>Status</th><th>Last seen</th></tr></thead>
+        <tbody><tr><td>ESP-APL-01</td><td>Emergency desk, ground floor</td><td><span class="badge active">Online</span></td><td>12s ago</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-h-profile">
+      <div class="card glass"><h4>Hospital details</h4>
+        <div class="field-row">
+          <div class="field"><label>Hospital name</label><input value="Apollo Central"></div>
+          <div class="field"><label>Hospital ID</label><input value="HOSP-CHN-001"></div>
+        </div>
+        <div class="field"><label>Address</label><input value="Greams Road, Chennai"></div>
+        <div class="doc-list"><div class="doc-row"><span>Registration / license</span><span class="badge approved">Verified</span></div></div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ================= ORGANIZER DASHBOARD ================= -->
+<section class="dash" id="dash-organizer" style="--accent:var(--violet);">
+  <aside class="sidebar">
+    <div class="side-brand">Q-TRANSPLANT</div>
+    <div class="side-role">Organizer Console</div>
+    <button class="nav-item active" data-pane="o-overview">Overview</button>
+    <button class="nav-item" data-pane="o-approvals">Doctor approvals</button>
+    <button class="nav-item" data-pane="o-users">Users</button>
+    <button class="nav-item" data-pane="o-hospitals">Hospitals</button>
+    <button class="nav-item" data-pane="o-emergency">Emergency monitor</button>
+    <button class="nav-item" data-pane="o-audit">Audit log</button>
+    <div class="sidebar-foot">
+      <div class="user-chip"><div class="user-avatar">O</div><div><div style="font-weight:600;">Organizer</div><div style="color:var(--muted); font-size:.7rem;">aravindhjoshua10@gmail.com</div></div></div>
+      <button class="signout" onclick="signOut()">Sign out</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="main-head"><div><h2>Organizer console</h2><div class="subtitle">Full operational oversight of Q-Transplant</div></div></div>
+
+    <div class="pane active" id="pane-o-overview">
+      <div class="stat-grid">
+        <div class="stat-card glass"><div class="num">228</div><div class="lbl">Total donors</div></div>
+        <div class="stat-card glass"><div class="num">204</div><div class="lbl">Active donors</div></div>
+        <div class="stat-card glass"><div class="num">96</div><div class="lbl">Total recipients</div></div>
+        <div class="stat-card glass"><div class="num">34</div><div class="lbl">Active cases</div></div>
+        <div class="stat-card glass"><div class="num">5</div><div class="lbl">Hospitals</div></div>
+        <div class="stat-card glass"><div class="num">41</div><div class="lbl">Approved doctors</div></div>
+        <div class="stat-card glass"><div class="num" style="color:var(--amber);" id="oPendingCount">2</div><div class="lbl">Pending doctors</div></div>
+        <div class="stat-card glass"><div class="num">12</div><div class="lbl">Completed cases</div></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-o-approvals">
+      <div class="card glass"><h4>Pending doctor approvals</h4>
+        <table id="approvalTable"><thead><tr><th>Name</th><th>Hospital</th><th>License</th><th>Submitted</th><th>Action</th></tr></thead>
+        <tbody id="approvalBody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-o-users">
+      <div class="card glass"><h4>All users</h4>
+        <table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Priya Ramanathan</td><td>Donor</td><td><span class="badge active">Active</span></td><td><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></td></tr>
+          <tr><td>Dr. Suresh K.</td><td>Doctor</td><td><span class="badge active">Active</span></td><td><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></td></tr>
+          <tr><td>Apollo Central</td><td>Hospital</td><td><span class="badge active">Active</span></td><td><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-o-hospitals">
+      <div class="card glass"><h4>Registered hospitals</h4>
+        <table><thead><tr><th>Hospital</th><th>Doctors</th><th>Cases</th><th>Device</th></tr></thead>
+        <tbody>
+          <tr><td>Apollo Central</td><td>12</td><td>34</td><td><span class="badge active">Online</span></td></tr>
+          <tr><td>Rainbow Multispeciality</td><td>8</td><td>19</td><td><span class="badge active">Online</span></td></tr>
+          <tr><td>MIOT International</td><td>10</td><td>27</td><td><span class="badge inactive">Offline</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-o-emergency">
+      <div class="card glass"><h4>Network-wide emergency monitor <span class="badge active" style="margin-left:8px;">Read + override</span></h4>
+        <div id="alertBanner3"></div>
+        <div id="hospGrid3" class="hgrid"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-o-audit">
+      <div class="card glass"><h4>Audit log</h4>
+        <div class="audit-log" id="auditLogView"></div>
+      </div>
+    </div>
+  </main>
+</section>
+
+</div><!-- /app -->
+
+<script>
+/* ================= 3D SPATIAL BACKGROUND =================
+   Heart + orbiting organs on login/donor/doctor screens; a live hospital
+   network globe on hospital/organizer screens — same treatment as the
+   Kisan Vision spinning-globe hero, themed to this project. */
+(function(){
+  const canvas = document.getElementById('bgCanvas');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, .1, 100);
+  camera.position.set(0,0,9);
+  function resize(){ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+  resize(); addEventListener('resize', resize);
+
+  scene.add(new THREE.AmbientLight(0x445566, 1.1));
+  const key = new THREE.PointLight(0xff5566, 3.2, 30); key.position.set(4,3,6); scene.add(key);
+  const rim = new THREE.PointLight(0x2DD4BF, 1.6, 30); rim.position.set(-5,-2,4); scene.add(rim);
+  const violetLight = new THREE.PointLight(0xA78BFA, 1.2, 30); violetLight.position.set(0,-4,3); scene.add(violetLight);
+
+  function heartShape(){
+    const s=new THREE.Shape(); const x=0,y=0;
+    s.moveTo(x+.5,y+.5); s.bezierCurveTo(x+.5,y+.5,x+.4,y,x,y);
+    s.bezierCurveTo(x-.6,y,x-.6,y+.7,x-.6,y+.7);
+    s.bezierCurveTo(x-.6,y+1.1,x-.3,y+1.54,x+.5,y+1.9);
+    s.bezierCurveTo(x+1.2,y+1.54,x+1.6,y+1.1,x+1.6,y+.7);
+    s.bezierCurveTo(x+1.6,y+.7,x+1.6,y,x+1,y);
+    s.bezierCurveTo(x+.7,y,x+.5,y+.5,x+.5,y+.5);
+    return s;
+  }
+  const heartGeo = new THREE.ExtrudeGeometry(heartShape(), {depth:.55, bevelEnabled:true, bevelThickness:.18, bevelSize:.14, bevelSegments:6, curveSegments:24});
+  heartGeo.center();
+  const heartMat = new THREE.MeshPhysicalMaterial({color:0xEF4444, roughness:.32, metalness:.06, clearcoat:.6, clearcoatRoughness:.25, emissive:0x8a0010, emissiveIntensity:.35});
+  const heart = new THREE.Mesh(heartGeo, heartMat);
+  heart.rotation.z = Math.PI;
+  const heartGroup = new THREE.Group(); heartGroup.add(heart); scene.add(heartGroup);
+
+  const organGroup = new THREE.Group(); scene.add(organGroup);
+  const organs = [];
+  function makeOrgan(color, scaleVec, radius, speed, tilt, roughness){
+    const geo = new THREE.SphereGeometry(.5,20,20);
+    const mat = new THREE.MeshStandardMaterial({color, roughness:roughness||.6, metalness:.05});
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.scale.set(...scaleVec);
+    const pivot = new THREE.Group(); pivot.rotation.x = tilt; pivot.add(mesh);
+    mesh.position.set(radius,0,0); organGroup.add(pivot);
+    organs.push({mesh, speed, radius, phase:Math.random()*Math.PI*2});
+  }
+  makeOrgan(0x8a3b2b,[.55,.8,.5],3.4,.6,.3,.7);
+  makeOrgan(0x7a2f22,[1.15,.85,.75],4.3,-.4,-.5,.75);
+  makeOrgan(0xd98a92,[.55,.85,.55],3.9,.5,1.0,.85);
+  makeOrgan(0xd98a92,[.55,.85,.55],3.9,.5,1.0,.85);
+  makeOrgan(0xc9a86a,[.42,.55,.42],4.7,-.55,-1.0,.7);
+  organs.forEach((o,i)=>o.phase=(i/organs.length)*Math.PI*2);
+
+  // network globe (hospital mesh) — hidden until hospital/organizer views
+  const globeGroup = new THREE.Group(); globeGroup.visible = false; scene.add(globeGroup);
+  const nodeCount = 9, nodes = [];
+  for(let i=0;i<nodeCount;i++){
+    const phi = Math.acos(1 - 2*(i+0.5)/nodeCount);
+    const theta = Math.PI*(1+Math.sqrt(5))*i;
+    const r = 6.4;
+    const p = new THREE.Vector3(r*Math.sin(phi)*Math.cos(theta), r*Math.sin(phi)*Math.sin(theta), r*Math.cos(phi));
+    nodes.push(p);
+    const nodeMesh = new THREE.Mesh(new THREE.SphereGeometry(.09,12,12), new THREE.MeshBasicMaterial({color:0xF5A524}));
+    nodeMesh.position.copy(p); globeGroup.add(nodeMesh);
+  }
+  for(let i=0;i<nodeCount;i++){
+    const j = (i+2)%nodeCount;
+    const mid = nodes[i].clone().add(nodes[j]).multiplyScalar(0.5).normalize().multiplyScalar(7.6);
+    const curve = new THREE.QuadraticBezierCurve3(nodes[i], mid, nodes[j]);
+    const pts = curve.getPoints(30);
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({color:0x2DD4BF, transparent:true, opacity:.35});
+    globeGroup.add(new THREE.Line(geo, mat));
+  }
+  // outer wireframe sphere, same "spinning globe" treatment as Kisan Vision
+  const wireGeo = new THREE.SphereGeometry(6.4, 24, 18);
+  const wireMat = new THREE.MeshBasicMaterial({color:0x2DD4BF, wireframe:true, transparent:true, opacity:.08});
+  globeGroup.add(new THREE.Mesh(wireGeo, wireMat));
+
+  const starGeo = new THREE.BufferGeometry(); const starCount=450;
+  const pos = new Float32Array(starCount*3);
+  for(let i=0;i<starCount;i++){ pos[i*3]=(Math.random()-.5)*32; pos[i*3+1]=(Math.random()-.5)*22; pos[i*3+2]=(Math.random()-.5)*22-4; }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color:0x3a4a58, size:.045})));
+
+  let mouseX=0, mouseY=0;
+  addEventListener('mousemove', e=>{ mouseX=(e.clientX/innerWidth-.5); mouseY=(e.clientY/innerHeight-.5); });
+
+  window.setSpatialMode = function(mode){
+    globeGroup.visible = (mode === 'network');
+    organGroup.visible = (mode !== 'network');
+    heartGroup.visible = (mode !== 'network');
+  };
+
+  const clock = new THREE.Clock();
+  (function animate(){
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+    heartGroup.rotation.y = t*.5;
+    const beat = 1 + Math.sin(t*3.2)*.045 + (Math.sin(t*3.2)>.85?.05:0);
+    heart.scale.set(1.55*beat,1.55*beat,1.55*beat);
+    organs.forEach(o=>{ const a=t*o.speed+o.phase; o.mesh.position.set(Math.cos(a)*o.radius, Math.sin(a*.6)*.4, Math.sin(a)*o.radius); o.mesh.rotation.y+=.02; });
+    globeGroup.rotation.y = t*.12;
+    camera.position.x += (mouseX*1.4 - camera.position.x)*.03;
+    camera.position.y += (-mouseY*1.0 - camera.position.y)*.03;
+    camera.lookAt(0,0,0);
+    renderer.render(scene, camera);
+  })();
+})();
+
+/* ================= APP STATE ================= */
+const App = { role:null, screen:'role' };
+const REGISTER_FIELDS = {
+  donor: [['fullName','Full name','text'],['email','Email','email'],['phone','Phone','text'],['bloodGroup','Blood group','select:O+,A+,B+,AB+,O-,A-,B-,AB-'],['dob','Date of birth','date'],['password','Password','password']],
+  doctor: [['fullName','Full name','text'],['email','Email','email'],['phone','Phone','text'],['license','License / registration number','text'],['hospital','Hospital','text'],['password','Password','password']],
+  hospital: [['hospitalName','Hospital name','text'],['email','Official email','email'],['phone','Contact number','text'],['hospitalId','Hospital ID','text'],['address','Address','text'],['password','Password','password']],
+  organizer: null // no public registration
+};
+
+function buildRegisterFields(role){
+  const wrap = document.getElementById('registerFields');
+  if(role==='organizer'){
+    wrap.innerHTML = `<p class="sub" style="text-align:left; font-size:.83rem;">Organizer accounts aren't self-registered — credentials are provisioned via environment variables by the system owner. Use the login tab.</p>`;
+    return;
+  }
+  wrap.innerHTML = REGISTER_FIELDS[role].map(([id,label,type])=>{
+    if(type.startsWith('select:')){
+      const opts = type.split(':')[1].split(',').map(o=>`<option>${o}</option>`).join('');
+      return `<div class="field"><label>${label}</label><select id="reg_${id}">${opts}</select></div>`;
+    }
+    return `<div class="field"><label>${label}</label><input type="${type}" id="reg_${id}" ${type==='email'?'placeholder="you@example.com"':''}></div>`;
+  }).join('') + (role==='doctor' ? `<div class="approval-note">Doctor accounts require organizer approval (license + certificate review) before the doctor portal unlocks. You'll get an email once reviewed.</div>` : '');
+}
+
+function goRole(){ showScreen('role'); }
+document.querySelectorAll('.role-card').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    App.role = c.dataset.role;
+    document.getElementById('authRoleLabel').textContent = c.querySelector('h3').textContent;
+    buildRegisterFields(App.role);
+    document.getElementById('panel-register').style.display = App.role==='organizer' ? 'none':'';
+    document.querySelector('#authTabs button[data-tab="register"]').style.display = App.role==='organizer' ? 'none':'';
+    switchAuthTab('login');
+    showScreen('auth');
+  });
+});
+
+function switchAuthTab(tab){
+  document.querySelectorAll('#authTabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.auth-panel').forEach(p=>p.classList.remove('active'));
+  if(tab==='login') document.getElementById('panel-login').classList.add('active');
+  if(tab==='register') document.getElementById('panel-register').classList.add('active');
+  if(tab==='forgot'){
+    document.getElementById('panel-forgot').classList.add('active');
+    document.getElementById('forgotStep1').style.display='';
+    document.getElementById('forgotStep2').style.display='none';
+  }
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+  document.body.classList.remove('dashboard-mode');
+  setSpatialMode(id==='auth' && App.role==='hospital' ? 'network' : 'default');
+}
+
+function showDashboard(role){
+  document.querySelectorAll('.screen, .dash').forEach(s=>s.classList.remove('active'));
+  document.getElementById('dash-'+role).classList.add('active');
+  document.body.classList.add('dashboard-mode');
+  setSpatialMode((role==='hospital'||role==='organizer') ? 'network' : 'default');
+  App.role = role;
+  if(role==='organizer') renderApprovals();
+  if(role==='hospital'){ renderHosp('hospGrid2','alertBanner2'); }
+  if(role==='organizer'){ renderHosp('hospGrid3','alertBanner3'); }
+  if(role==='doctor'){ renderHosp('drNetworkMini', null, true); }
+}
+
+function signOut(){ toast('Signed out','cyan'); showScreen('role'); App.role=null; }
+
+/* ---- login / register / otp (demo logic — see backend_emergency_ws.py / auth_service.py for real endpoints) ---- */
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  if(!email){ toast('Enter your email','err'); return; }
+  toast('Logged in as '+App.role, 'cyan');
+  logAudit('LOGIN', email || App.role);
+  showDashboard(App.role);
+}
+
+function doRegister(){
+  if(App.role==='organizer') return;
+  toast(App.role==='doctor' ? 'Registered — pending organizer approval' : 'Account created', App.role==='doctor'?'warn':'cyan');
+  logAudit('REGISTER', App.role.toUpperCase()+'_ACCOUNT');
+  if(App.role==='doctor'){
+    switchAuthTab('login');
+    document.getElementById('loginNote').textContent = 'Your registration is pending organizer review. You\'ll receive an email once approved.';
+  } else {
+    showDashboard(App.role);
+  }
+}
+
+let currentOtp = null;
+function sendOtp(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  if(!email){ toast('Enter your email','err'); return; }
+  currentOtp = String(Math.floor(100000 + Math.random()*900000));
+  document.getElementById('demoOtpBanner').innerHTML =
+    `DEMO MODE — in production this code is emailed only, by aravindhjoshua10@gmail.com via the organizer SMTP relay.<br>For this preview, your code is: <b style="color:var(--text); font-size:.85rem;">${currentOtp}</b>`;
+  document.getElementById('forgotStep1').style.display='none';
+  document.getElementById('forgotStep2').style.display='';
+  document.querySelectorAll('.otpd').forEach((el,i,arr)=>{
+    el.value=''; el.oninput = ()=>{ if(el.value && arr[i+1]) arr[i+1].focus(); };
+  });
+  toast('OTP sent from aravindhjoshua10@gmail.com','cyan');
+  logAudit('OTP_REQUESTED', email);
+}
+function resetPassword(){
+  const entered = Array.from(document.querySelectorAll('.otpd')).map(i=>i.value).join('');
+  const pw = document.getElementById('newPassword').value;
+  if(entered.length<6){ toast('Enter all 6 digits','err'); return; }
+  if(entered !== currentOtp){ toast('Incorrect OTP','err'); return; }
+  if(pw.length<8){ toast('Password must be 8+ characters','err'); return; }
+  toast('Password reset — log in with your new password','cyan');
+  logAudit('PASSWORD_RESET', 'via OTP');
+  switchAuthTab('login');
+}
+
+/* ---- toasts ---- */
+function toast(msg, kind){
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind==='err'?' err':kind==='warn'?' warn':'');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(), 3800);
+}
+
+/* ---- audit log (shared across every dashboard) ---- */
+const auditEvents = [
+  {a:'DOCTOR_APPROVED', t:'Dr. Nandhini R.', when:'Yesterday, 6:40 PM'},
+  {a:'MATCH_GENERATED', t:'Meenakshi V. → 3 candidates', when:'Yesterday, 2:15 PM'},
+  {a:'HOSPITAL_VERIFIED', t:'Rainbow Multispeciality', when:'2 days ago'},
+];
+function logAudit(action, target){
+  auditEvents.unshift({a:action, t:target, when:'just now'});
+  renderAudit();
+}
+function renderAudit(){
+  const el = document.getElementById('auditLogView');
+  if(!el) return;
+  el.innerHTML = auditEvents.slice(0,40).map(e=>`<div><span class="a-time">${e.when}</span><span class="a-action">${e.a}</span>${e.t}</div>`).join('');
+}
+
+/* ---- doctor approvals (organizer) ---- */
+let pendingDoctors = [
+  {name:'Dr. Vikram S.', hospital:'Apollo Central', license:'TN-MED-91027', submitted:'2 days ago'},
+  {name:'Dr. Kavya M.', hospital:'MIOT International', license:'TN-MED-77341', submitted:'5 hrs ago'},
+];
+function renderApprovals(){
+  const body = document.getElementById('approvalBody');
+  document.getElementById('oPendingCount').textContent = pendingDoctors.length;
+  if(pendingDoctors.length===0){ body.innerHTML = `<tr><td colspan="5" style="color:var(--muted);">No pending approvals.</td></tr>`; return; }
+  body.innerHTML = pendingDoctors.map((d,i)=>`
+    <tr><td>${d.name}</td><td>${d.hospital}</td><td>${d.license}</td><td>${d.submitted}</td>
+    <td class="row-actions">
+      <button class="approve" onclick="approveDoctor(${i})">Approve</button>
+      <button class="reject" onclick="rejectDoctor(${i})">Reject</button>
+    </td></tr>`).join('');
+}
+function approveDoctor(i){
+  const d = pendingDoctors[i];
+  toast(d.name+' approved — email sent','cyan');
+  logAudit('DOCTOR_APPROVED', d.name);
+  pendingDoctors.splice(i,1); renderApprovals();
+}
+function rejectDoctor(i){
+  const d = pendingDoctors[i];
+  toast(d.name+' rejected — email sent','warn');
+  logAudit('DOCTOR_REJECTED', d.name);
+  pendingDoctors.splice(i,1); renderApprovals();
+}
+
+/* ---- matching engine demo (doctor) ---- */
+function runMatch(){
+  const candidates = [
+    {id:'DNR-0231', blood:98, hla:91, urgency:'CRITICAL', score:94},
+    {id:'DNR-0198', blood:98, hla:78, urgency:'CRITICAL', score:86},
+    {id:'DNR-0304', blood:72, hla:64, urgency:'CRITICAL', score:61},
+  ];
+  document.getElementById('matchResults').innerHTML = candidates.map(c=>`
+    <div style="padding:14px 0; border-top:1px solid var(--line);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <b style="font-family:var(--disp);">${c.id}</b>
+        <span style="font-family:var(--disp); font-weight:700; color:${c.score>85?'var(--cyan)':c.score>70?'var(--amber)':'var(--muted)'};">${c.score}/100</span>
+      </div>
+      <div class="explain-grid">
+        <div class="explain-item ${c.blood>=90?'pass':'fail'}"><div class="v">${c.blood>=90?'PASS':'CHECK'}</div><div class="k">Blood group</div></div>
+        <div class="explain-item ${c.hla>=75?'pass':'fail'}"><div class="v">${c.hla}%</div><div class="k">HLA match</div></div>
+        <div class="explain-item pass"><div class="v">PASS</div><div class="k">Organ type</div></div>
+        <div class="explain-item pass"><div class="v">${c.urgency}</div><div class="k">Urgency</div></div>
+      </div>
+    </div>`).join('');
+  toast('Matching engine run — 3 candidates ranked','cyan');
+  logAudit('MATCH_GENERATED', 'Meenakshi V. → 3 candidates');
+}
+
+/* ================= EMERGENCY NETWORK (shared model, rendered into 3 mount points) ================= */
+const hospitalsData = [
+  {id:'h1', name:'Apollo Central', city:'Chennai · 2.1 km', status:'idle', requirement:''},
+  {id:'h2', name:'Rainbow Multispeciality', city:'Chennai · 5.6 km', status:'idle', requirement:''},
+  {id:'h3', name:'MIOT International', city:'Chennai · 8.9 km', status:'idle', requirement:''},
+  {id:'h4', name:'Fortis Malar', city:'Chennai · 3.4 km', status:'idle', requirement:''},
+  {id:'h5', name:'Global Health City', city:'Chennai · 11.2 km', status:'idle', requirement:''},
+];
+const mounts = []; // {gridId, bannerId, miniOnly}
+
+function renderHosp(gridId, bannerId, miniOnly){
+  if(!mounts.find(m=>m.gridId===gridId)) mounts.push({gridId, bannerId, miniOnly});
+  renderAllMounts();
+}
+function renderAllMounts(){
+  mounts.forEach(({gridId, bannerId, miniOnly})=>{
+    const grid = document.getElementById(gridId);
+    if(!grid) return;
+    if(miniOnly){
+      grid.innerHTML = hospitalsData.map(h=>`<div style="display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--line-soft); font-size:.82rem;"><span>${h.name}</span><span class="badge ${h.status==='idle'?'inactive':h.status==='emergency'?'critical':'active'}">${h.status}</span></div>`).join('');
+      return;
+    }
+    grid.innerHTML = hospitalsData.map(h=>{
+      const anyoneElseEmergency = hospitalsData.some(x=>x.status==='emergency' && x.id!==h.id);
+      const oled = [`HOSP: ${h.name.slice(0,18)}`, h.status==='idle'?'STATUS: STANDBY':`STATUS: ${h.status.toUpperCase()}`, h.requirement?`REQ: ${h.requirement.slice(0,36)}`:'REQ: -- waiting --'].join('\n');
+      return `<div class="hcard state-${h.status}">
+        <div class="hcard-top"><b>${h.name}</b><span class="badge ${h.status==='idle'?'inactive':h.status==='emergency'?'critical':'active'}">${anyoneElseEmergency&&h.status==='idle'?'🔔':h.status}</span></div>
+        <div class="city">${h.city}</div>
+        <div class="oled">${oled}<span class="cursor">▌</span></div>
+        <textarea class="req-input" rows="2" placeholder="Requirement..." oninput="updateReq('${h.id}', this.value)">${h.requirement}</textarea>
+        <div class="mini-actions">
+          <button class="mini-btn emerg" ${h.status!=='idle'?'disabled':''} onclick="hospAction('${h.id}','emergency')">Emergency</button>
+          <button class="mini-btn donor" ${!hospitalsData.some(x=>x.status==='emergency'&&x.id!==h.id)?'disabled':''} onclick="hospAction('${h.id}','donorfound')">Donor found</button>
+          <button class="mini-btn ack" ${h.status!=='donorfound'?'disabled':''} onclick="hospAction('${h.id}','ack')">Acknowledge</button>
+        </div>
+      </div>`;
+    }).join('');
+    if(bannerId) updateBanner(bannerId);
+  });
+}
+function updateReq(id, val){ hospitalsData.find(h=>h.id===id).requirement = val; renderAllMounts(); }
+function updateBanner(bannerId){
+  const el = document.getElementById(bannerId); if(!el) return;
+  const emergency = hospitalsData.find(h=>h.status==='emergency');
+  const donor = hospitalsData.find(h=>h.status==='donorfound');
+  if(emergency){ el.style.display='block'; el.className=''; el.innerHTML = `🚨 EMERGENCY — <b>${emergency.name}</b> needs a match now. ${emergency.requirement?'Requirement: '+emergency.requirement:'No requirement text yet.'}`; }
+  else if(donor){ el.style.display='block'; el.className='donorfound'; el.innerHTML = `✅ DONOR FOUND — response ready for <b>${donor.name}</b>. Awaiting acknowledgement.`; }
+  else { el.style.display='none'; }
+}
+function hospAction(id, action){
+  unlockAudio();
+  const h = hospitalsData.find(x=>x.id===id);
+  if(action==='emergency'){ h.status='emergency'; playAmbulance(); logAudit('EMERGENCY_CREATED', h.name); }
+  else if(action==='donorfound'){ const e = hospitalsData.find(x=>x.status==='emergency'); if(e){ e.status='donorfound'; } playChime(); logAudit('MATCH_GENERATED', h.name+' → '+(e?e.name:'?')); }
+  else if(action==='ack'){ h.status='idle'; h.requirement=''; playAckTone(); logAudit('EMERGENCY_ACKNOWLEDGED', h.name); }
+  renderAllMounts();
+}
+function doctorTriggerEmergency(){
+  const req = document.getElementById('drEmergReq').value;
+  const h = hospitalsData.find(x=>x.id==='h1');
+  h.status='emergency'; h.requirement=req;
+  unlockAudio(); playAmbulance();
+  toast('Emergency triggered for Apollo Central','err');
+  logAudit('EMERGENCY_CREATED', 'Apollo Central (via Dr. Suresh K.)');
+  renderAllMounts();
+}
+
+/* ---- sound design ---- */
+let actx;
+function unlockAudio(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); }
+function tone(freq,start,dur,type,gainVal){ const o=actx.createOscillator(),g=actx.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(freq,start); g.gain.setValueAtTime(0,start); g.gain.linearRampToValueAtTime(gainVal||.18,start+.02); g.gain.linearRampToValueAtTime(0,start+dur); o.connect(g); g.connect(actx.destination); o.start(start); o.stop(start+dur+.05); }
+function playAmbulance(){ if(!actx) return; const now=actx.currentTime; for(let i=0;i<4;i++){ const t0=now+i*.9; const o=actx.createOscillator(), g=actx.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(500,t0); o.frequency.linearRampToValueAtTime(880,t0+.45); o.frequency.linearRampToValueAtTime(500,t0+.9); g.gain.setValueAtTime(.09,t0); o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0+.9); } }
+function playChime(){ if(!actx) return; const now=actx.currentTime; [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f, now+i*.12, .35, 'triangle', .16)); }
+function playAckTone(){ if(!actx) return; tone(340, actx.currentTime, .4, 'sine', .14); }
+
+/* ---- sidebar nav wiring ---- */
+document.querySelectorAll('.nav-item').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const sidebar = btn.closest('.sidebar');
+    sidebar.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const main = sidebar.nextElementSibling;
+    main.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+    document.getElementById('pane-'+btn.dataset.pane).classList.add('active');
+  });
+});
+
+renderAudit();
+</script>
+</body>
+</html>
