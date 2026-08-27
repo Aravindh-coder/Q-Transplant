@@ -98,16 +98,16 @@ body{
 
 .main{flex:1; padding:32px 38px 60px; overflow-y:auto; max-height:calc(100vh - 60px);}
 
-/* Organizer Dashboard Circuit Background */
-.organizer-bg-container{
-  background-image: url('organizer_bg.png');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
+/* Organizer Dashboard Circuit Background & Glassmorphism */
 .organizer-glass-overlay{
-  background: rgba(7, 12, 24, 0.78) !important;
-  backdrop-filter: blur(14px) !important;
+  background: transparent !important;
+}
+.organizer-glass-overlay .card, .organizer-glass-overlay .stat-card{
+  background: rgba(10, 18, 36, 0.58) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border: 1px solid rgba(45, 212, 191, 0.45) !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5) !important;
 }
 
 .main-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:10px;}
@@ -147,7 +147,7 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 </style>
 <body>
 
-<img id="organizerBgImage" src="organizer_bg.png" alt="Organizer Background" style="position:fixed; inset:0; width:100vw; height:100vh; object-fit:cover; z-index:0; display:none; pointer-events:none; filter:brightness(1.15) contrast(1.08);">
+<img id="organizerBgImage" src="organizer_bg.png" alt="Organizer Background" style="position:fixed; inset:0; width:100vw; height:100vh; object-fit:cover; z-index:0; display:none; pointer-events:none; opacity:1.0; filter:brightness(1.4) contrast(1.2) saturate(1.3);">
 
 <div class="top-header">
   <a href="index.html" class="brandmark">
