@@ -148,6 +148,7 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 <body>
 
 <img id="organizerBgImage" src="organizer_bg.png" alt="Organizer Background" style="position:fixed; inset:0; width:100vw; height:100vh; object-fit:cover; z-index:0; display:none; pointer-events:none; opacity:1.0; filter:brightness(1.4) contrast(1.2) saturate(1.3);">
+<img id="loginBgImage" src="login_bg.png" alt="Login Background" style="position:fixed; inset:0; width:100vw; height:100vh; object-fit:cover; z-index:0; display:none; pointer-events:none; opacity:1.0; filter:brightness(1.35) contrast(1.25) saturate(1.1);">
 
 <div class="top-header">
   <a href="index.html" class="brandmark">
@@ -313,11 +314,18 @@ function handleRoute() {
   document.getElementById("currentRouteDisplay").innerText = config.title;
   document.querySelectorAll(".route-view").forEach(v => v.classList.remove("active"));
 
-  const bgImg = document.getElementById("organizerBgImage");
+  const orgBg = document.getElementById("organizerBgImage");
+  const loginBg = document.getElementById("loginBgImage");
+
   if (config.role === "organizer") {
-    bgImg.style.display = "block";
+    orgBg.style.display = "block";
+    loginBg.style.display = "none";
+  } else if (config.view !== "dashboard") {
+    orgBg.style.display = "none";
+    loginBg.style.display = "block";
   } else {
-    bgImg.style.display = "none";
+    orgBg.style.display = "none";
+    loginBg.style.display = "none";
   }
 
   if (config.view === "dashboard") {
