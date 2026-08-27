@@ -17,10 +17,11 @@ def main():
 
     # 2. Start FastAPI Backend
     print("\n[2/3] Starting FastAPI Backend on http://localhost:8000 ...")
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "backend", "backend")))
+    backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "backend", "backend"))
+    venv_uvicorn = os.path.abspath(os.path.join(os.path.dirname(__file__), "venv", "bin", "uvicorn"))
     
-    backend_cmd = ["./venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-    backend_proc = subprocess.Popen(backend_cmd)
+    backend_cmd = [venv_uvicorn, "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    backend_proc = subprocess.Popen(backend_cmd, cwd=backend_path)
 
     # 3. Start Frontend HTTP Server
     print("\n[3/3] Starting Frontend HTTP Server on http://localhost:5173 ...")

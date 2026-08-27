@@ -12,17 +12,35 @@ router = APIRouter(prefix="/api/v1/quantum", tags=["quantum"])
 
 @router.get("/grover-sim")
 def get_grover_simulation(n_candidates: int = Query(64, ge=4, le=1000), target_index: int = Query(3, ge=0)):
+    import math
+    optimal_iters = max(1, int(round((math.pi / 4.0) * math.sqrt(n_candidates))))
     return {
         "n_candidates": n_candidates,
         "target_index": target_index,
-        "theoretical_optimal_iterations": max(1, int(round((3.14159 / 4.0) * (n_candidates ** 0.5)))),
-        "steps": simulate_grover_steps(n_candidates, target_index)
+        "theoretical_optimal_iterations": optimal_iters,
+        "steps": simulate_grover_steps(n_candidates, target_index, max_steps=optimal_iters)
     }
 
 @router.get("/benchmark")
-def get_quantum_benchmark(n_values: str = "10,100,500,1000"):
-    n_list = [int(x.strip()) for x in n_values.split(",") if x.strip().isdigit()]
-    return run_benchmark(n_list)
+def get_quantum_benchmark():
+    import math, random as rng
+    results = []
+    for n in [10, 100, 500, 1000]:
+        cands = [{"id": i, "score": rng.random()} for i in range(n)]
+        def sf(c): return c["score"]
+        from app.services.quantum.benchmark import run_benchmark
+        r = run_benchmark(cands, sf)
+        results.append({
+            "pool_size": n,
+            "classical_evals": r["classical"]["evaluations"],
+            "quantum_evals": r["quantum_inspired"]["evaluations"],
+            "reduction_pct": r["evaluation_reduction_pct"],
+            "classical_time_s": r["classical"]["time_seconds"],
+            "quantum_time_s": r["quantum_inspired"]["time_seconds"],
+            "theoretical_speedup": f"{n / max(1, int(math.sqrt(n))):.1f}x",
+            "same_optimum": r["same_optimum_found"]
+        })
+    return {"benchmark": results}
 
 @router.get("/search-donors")
 def search_donors_quantum(organ: str, blood_group: str, db: Session = Depends(get_db)):
