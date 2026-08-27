@@ -308,7 +308,7 @@ td{padding:12px 12px; border-bottom:1px solid var(--line-soft);}
 
 <script>
 let currentSelectedRole = 'doctor';
-let 3DScene = null, 3DHeart = null, 3DGlobe = null;
+let scene3D = null, heart3D = null, globe3D = null;
 
 // Three.js 3D Motion Framework Setup (Super Bright & Vibrant)
 function init3DMotionFramework() {
@@ -341,17 +341,17 @@ function init3DMotionFramework() {
   const heartGeo = new THREE.ExtrudeGeometry(heartShape(), {depth:.55, bevelEnabled:true, bevelThickness:.18, bevelSize:.12, bevelSegments:6});
   heartGeo.center();
   const heartMat = new THREE.MeshPhysicalMaterial({color:0xEF4444, roughness:.2, metalness:.15, clearcoat:1.0, emissive:0xaa0015, emissiveIntensity:.6});
-  3DHeart = new THREE.Mesh(heartGeo, heartMat);
-  3DHeart.rotation.z = Math.PI;
-  3DHeart.scale.set(1.5, 1.5, 1.5);
-  scene.add(3DHeart);
+  heart3D = new THREE.Mesh(heartGeo, heartMat);
+  heart3D.rotation.z = Math.PI;
+  heart3D.scale.set(1.5, 1.5, 1.5);
+  scene.add(heart3D);
 
   // Holographic 3D Globe Mesh
   const globeGeo = new THREE.SphereGeometry(4.8, 28, 20);
   const globeMat = new THREE.MeshBasicMaterial({color:0x2DD4BF, wireframe:true, transparent:true, opacity:.22});
-  3DGlobe = new THREE.Mesh(globeGeo, globeMat);
-  3DGlobe.visible = false;
-  scene.add(3DGlobe);
+  globe3D = new THREE.Mesh(globeGeo, globeMat);
+  globe3D.visible = false;
+  scene.add(globe3D);
 
   // Glowing Particles
   const starGeo = new THREE.BufferGeometry();
@@ -364,12 +364,12 @@ function init3DMotionFramework() {
   function animate() {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
-    if(3DHeart) {
-      3DHeart.rotation.y = t * 0.5;
+    if(heart3D) {
+      heart3D.rotation.y = t * 0.5;
       const pulse = 1 + Math.sin(t * 3.4) * 0.06;
-      3DHeart.scale.set(1.5 * pulse, 1.5 * pulse, 1.5 * pulse);
+      heart3D.scale.set(1.5 * pulse, 1.5 * pulse, 1.5 * pulse);
     }
-    if(3DGlobe) { 3DGlobe.rotation.y = t * 0.18; }
+    if(globe3D) { globe3D.rotation.y = t * 0.18; }
     renderer.render(scene, camera);
   }
   animate();
@@ -447,11 +447,11 @@ function loadRoleDashboard(role) {
   const mainContent = document.getElementById("dashMainContent");
 
   if (role === 'doctor' || role === 'donor') {
-    if(3DHeart) 3DHeart.visible = true; 
-    if(3DGlobe) 3DGlobe.visible = false;
+    if(heart3D) heart3D.visible = true; 
+    if(globe3D) globe3D.visible = false;
   } else {
-    if(3DHeart) 3DHeart.visible = false; 
-    if(3DGlobe) 3DGlobe.visible = true;
+    if(heart3D) heart3D.visible = false; 
+    if(globe3D) globe3D.visible = true;
   }
 
   if (role === 'organizer') {
