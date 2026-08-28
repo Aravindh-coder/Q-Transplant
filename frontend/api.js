@@ -1,5 +1,5 @@
 // Frontend transport layer. Business/medical decisions stay in the backend.
-export const API_BASE = (localStorage.getItem('qt_api') || 'http://localhost:9900').replace(/\/$/, '');
+export const API_BASE = (localStorage.getItem('qt_api') || 'https://q-transplant.onrender.com').replace(/\/$/, '');
 
 export async function api(path, options = {}) {
   const headers = { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(options.headers || {}) };
