@@ -9,7 +9,7 @@
 </style></head>
 <body><div id="root"></div><div id="toast" class="toast hidden"></div>
 <script>
-const API=(localStorage.getItem('qt_api')||'http://localhost:9900').replace(/\/$/,'');
+const API=(localStorage.getItem('qt_api')||'').replace(/\/$/,'');
 const S={token:localStorage.getItem('qt_token')||'',role:localStorage.getItem('qt_role')||'',email:localStorage.getItem('qt_email')||'',view:location.hash.slice(1)||'home'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function toast(m){let e=document.getElementById('toast');e.textContent=m;e.classList.remove('hidden');setTimeout(()=>e.classList.add('hidden'),3500)}
