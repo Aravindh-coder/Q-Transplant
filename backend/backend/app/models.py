@@ -6,15 +6,12 @@ from app.database import Base
 
 def uid(): return str(uuid.uuid4())
 def now(): return datetime.now(timezone.utc)
-
 class User(Base):
     __tablename__="users"; id=Column(String,primary_key=True,default=uid); email=Column(String,unique=True,index=True,nullable=False); hashed_password=Column(String,nullable=False); role=Column(String,index=True,nullable=False); full_name=Column(String,nullable=False); status=Column(String,index=True,default="active"); email_verified=Column(Boolean,default=False,index=True); created_at=Column(DateTime,index=True,default=now)
 class OTP(Base):
     __tablename__="otps"; id=Column(String,primary_key=True,default=uid); email=Column(String,index=True,nullable=False); code_hash=Column(String,nullable=False); purpose=Column(String,index=True,default="password_reset"); expires_at=Column(DateTime,index=True,nullable=False); used=Column(Boolean,index=True,default=False); created_at=Column(DateTime,index=True,default=now)
 class RevokedToken(Base):
     __tablename__="revoked_tokens"; id=Column(String,primary_key=True,default=uid); token_jti=Column(String,unique=True,index=True,nullable=False); expires_at=Column(DateTime,index=True,nullable=False); created_at=Column(DateTime,default=now)
-class Document(Base):
-    __tablename__="documents"; id=Column(String,primary_key=True,default=uid); owner_user_id=Column(String,ForeignKey("users.id"),index=True,nullable=False); kind=Column(String,index=True,nullable=False); filename=Column(String,nullable=False); storage_path=Column(String,nullable=False); verification_status=Column(String,index=True,default="pending"); uploaded_at=Column(DateTime,index=True,default=now)
 class DonorProfile(Base):
     __tablename__="donor_profiles"; id=Column(String,primary_key=True,default=uid); user_id=Column(String,ForeignKey("users.id"),unique=True,index=True,nullable=False); date_of_birth=Column(String); gender=Column(String); phone=Column(String); address=Column(String); blood_group=Column(String,nullable=False,index=True); organs_available=Column(JSON,default=list); hla_a=Column(String); hla_b=Column(String); hla_c=Column(String); hla_dr=Column(String); hla_dq=Column(String); medical_information=Column(Text); availability_status=Column(String,index=True,default="active"); donation_status=Column(String,index=True,default="ACTIVE"); hospital_id=Column(String,ForeignKey("hospital_profiles.id"),index=True); verification_status=Column(String,index=True,default="pending"); created_at=Column(DateTime,default=now); updated_at=Column(DateTime,default=now,onupdate=now)
 class DoctorProfile(Base):
