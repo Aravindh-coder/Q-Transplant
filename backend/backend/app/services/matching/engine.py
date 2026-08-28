@@ -3,7 +3,7 @@ from .blood import check_blood
 from .hla import check_hla
 from .organ import check_organ
 from .urgency import calculate_recipient_priority
-from .ranking import rank_candidate
+from .ranking import rank_candidate, rank_candidates
 
 def evaluate(donor: dict, recipient: dict, hospital_ready: bool = True) -> dict | None:
     blood = check_blood(donor, recipient)
