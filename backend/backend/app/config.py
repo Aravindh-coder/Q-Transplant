@@ -4,8 +4,19 @@ from dotenv import load_dotenv
 load_dotenv()
 BASE_DIR=os.path.abspath(os.path.join(os.path.dirname(__file__),"..","..",".."))
 DEFAULT_DB_PATH=os.path.join(BASE_DIR,"qtransplant.db")
+
+def _normalize_db_url(url:str)->str:
+    # Aiven/Heroku-style URLs use the legacy "postgres://" scheme, which
+    # modern SQLAlchemy refuses to parse — rewrite it to "postgresql://".
+    if url.startswith("postgres://"):
+        url="postgresql://"+url[len("postgres://"):]
+    # Aiven requires SSL; add it if the caller didn't already specify a mode.
+    if url.startswith("postgresql://") and "sslmode" not in url:
+        url += ("&" if "?" in url else "?") + "sslmode=require"
+    return url
+
 class Settings:
-    DATABASE_URL=os.environ.get("DATABASE_URL",f"sqlite:///{DEFAULT_DB_PATH}")
+    DATABASE_URL=_normalize_db_url(os.environ.get("DATABASE_URL",f"sqlite:///{DEFAULT_DB_PATH}"))
     JWT_SECRET=os.environ.get("JWT_SECRET","")
     JWT_ALGO="HS256"
     ACCESS_TOKEN_MINUTES=int(os.environ.get("ACCESS_TOKEN_MINUTES",720))
@@ -20,3 +31,7 @@ class Settings:
 settings=Settings()
 if not settings.JWT_SECRET:
     raise RuntimeError("JWT_SECRET must be configured in the environment.")
+if settings.DATABASE_URL.startswith("sqlite") and os.environ.get("RENDER"):
+    # On Render, sqlite means DATABASE_URL wasn't actually set — data won't
+    # persist across deploys/restarts. Fail loudly instead of silently.
+    raise RuntimeError("DATABASE_URL is not set — refusing to fall back to sqlite in production (Render).")

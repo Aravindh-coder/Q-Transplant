@@ -9,6 +9,13 @@ HOSPITAL_READINESS_BONUS = 5
 def calculate_priority(urgency: str, waiting_since: datetime, hospital_ready: bool = True) -> dict:
     urgency = (urgency or "MEDIUM").upper()
     base = URGENCY_BASE.get(urgency, URGENCY_BASE["MEDIUM"])
+    if isinstance(waiting_since, str):
+        try: waiting_since = datetime.fromisoformat(waiting_since.replace("Z", "+00:00"))
+        except ValueError: waiting_since = None
+    if not isinstance(waiting_since, datetime):
+        # No waiting_since on record (new patient, not yet backfilled) —
+        # treat as just-registered rather than crashing the match run.
+        waiting_since = datetime.now(timezone.utc)
     if waiting_since.tzinfo is None:
         waiting_since = waiting_since.replace(tzinfo=timezone.utc)
     days_waiting = max((datetime.now(timezone.utc) - waiting_since).days, 0)

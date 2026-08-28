@@ -1,4 +1,5 @@
 """Q-Transplant FastAPI application entry point."""
+import logging
 from sqlalchemy import inspect, text
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,8 @@ from app.database import Base, engine
 from app.routers import auth, donors, doctors, hospitals, patients, matching, organizer, devices, emergency, quantum_router, documents, donor_requests, notifications, users, hla, transplants
 from app.routers import doctor_workflow, hospital_workflow
 from app.services.security_headers import SecurityHeadersMiddleware
+
+logger=logging.getLogger("qtransplant.startup")
 
 def ensure_schema():
  Base.metadata.create_all(bind=engine)
@@ -17,7 +20,15 @@ def ensure_schema():
    existing={c["name"] for c in inspector.get_columns(table)}
    for name,typ in cols:
     if name not in existing: conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {typ}"))
-ensure_schema()
+try:
+    ensure_schema()
+except Exception:
+    # A transient DB hiccup (cold Aiven connection, brief network blip) at
+    # import time used to take the whole process down before it could even
+    # bind to a port. Log it loudly and let the app boot; DB-dependent
+    # routes will surface their own errors instead of the service never
+    # coming up at all.
+    logger.exception("ensure_schema() failed at startup — app is booting anyway; DB-dependent routes may fail until this is resolved.")
 app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.2.0")
 app.add_middleware(CORSMiddleware,allow_origins=settings.ALLOWED_ORIGINS,allow_credentials=True,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["Authorization","Content-Type"],max_age=600)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -25,4 +36,9 @@ for router in (auth.router,users.router,donors.router,doctors.router,hospitals.r
 @app.get("/")
 def root(): return {"service":"Q-Transplant API","status":"online","version":"2.2.0"}
 @app.get("/health")
-def health(): return {"status":"ok"}
+def health():
+    try:
+        with engine.connect() as conn: conn.execute(text("SELECT 1"))
+        return {"status":"ok","database":"connected"}
+    except Exception as e:
+        return {"status":"ok","database":"unreachable","detail":str(e)}
