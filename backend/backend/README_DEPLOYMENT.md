@@ -4,7 +4,10 @@
 - `JWT_SECRET`: long random secret; never commit it.
 - `DATABASE_URL`: use PostgreSQL in production.
 - `ORGANIZER_EMAIL` / `ORGANIZER_APP_PASSWORD`: SMTP sender credentials.
-- `ALLOWED_ORIGINS`: comma-separated production frontend origins.
+- `ALLOWED_ORIGINS`: comma-separated production frontend origins. Since the
+  frontend (`public/`) is now served by this same FastAPI app, this is only
+  needed if something else (an emergency device, a separate admin panel,
+  local `npm run dev`, etc.) calls the API from a different origin.
 - Configure OTP/login rate limits and token expiry for deployment.
 
 ## Production requirements
