@@ -23,6 +23,21 @@ def ensure_schema():
    existing={c["name"] for c in inspector.get_columns(table)}
    for name,typ in cols:
     if name not in existing: conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {typ}"))
+def ensure_organizer_bootstrap():
+    from app.models import User
+    from app.security import hash_password
+    from app.database import SessionLocal
+    if not (settings.ORGANIZER_BOOTSTRAP_EMAIL and settings.ORGANIZER_BOOTSTRAP_PASSWORD):
+        return
+    db=SessionLocal()
+    try:
+        if db.query(User).filter(User.role=="organizer").first():
+            return  # an organizer already exists — never overwrite silently
+        db.add(User(email=settings.ORGANIZER_BOOTSTRAP_EMAIL,hashed_password=hash_password(settings.ORGANIZER_BOOTSTRAP_PASSWORD),role="organizer",full_name="Organizer",status="active",email_verified=True))
+        db.commit()
+        logger.info("Bootstrapped the first organizer account from ORGANIZER_BOOTSTRAP_EMAIL.")
+    finally:
+        db.close()
 try:
     ensure_schema()
 except Exception:
@@ -32,6 +47,10 @@ except Exception:
     # routes will surface their own errors instead of the service never
     # coming up at all.
     logger.exception("ensure_schema() failed at startup — app is booting anyway; DB-dependent routes may fail until this is resolved.")
+try:
+    ensure_organizer_bootstrap()
+except Exception:
+    logger.exception("ensure_organizer_bootstrap() failed at startup.")
 app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.2.0")
 app.add_middleware(CORSMiddleware,allow_origins=settings.ALLOWED_ORIGINS,allow_credentials=True,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["Authorization","Content-Type"],max_age=600)
 app.add_middleware(SecurityHeadersMiddleware)

@@ -3,7 +3,21 @@
 ## Required environment
 - `JWT_SECRET`: long random secret; never commit it.
 - `DATABASE_URL`: use PostgreSQL in production.
-- `ORGANIZER_EMAIL` / `ORGANIZER_APP_PASSWORD`: SMTP sender credentials.
+- `ORGANIZER_EMAIL` / `ORGANIZER_APP_PASSWORD`: SMTP sender credentials
+  (a Gmail address + app password) used to deliver OTPs and notifications.
+  Without these set, `/forgot-password`, email verification, and organizer
+  notification emails silently fail to send (by design — the API never
+  reveals whether an email exists, so a misconfigured mailer looks
+  identical to "email not registered" from the client's perspective).
+- `ORGANIZER_BOOTSTRAP_EMAIL` / `ORGANIZER_BOOTSTRAP_PASSWORD`: the very
+  first organizer login. Organizer accounts can't self-register through
+  `/register` (by design), so without these set, a fresh database has
+  **no organizer account at all** and every organizer login attempt will
+  fail with "Incorrect email or password" regardless of what's typed. Set
+  these once, redeploy, then unset/rotate the password afterward — the
+  bootstrap only ever creates the first organizer and never overwrites an
+  existing one. Deliberately distinct from `ORGANIZER_EMAIL` above, which
+  is only an SMTP sender identity, not a login.
 - `ALLOWED_ORIGINS`: comma-separated production frontend origins. Since the
   frontend (`public/`) is now served by this same FastAPI app, this is only
   needed if something else (an emergency device, a separate admin panel,

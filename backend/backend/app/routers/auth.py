@@ -38,7 +38,7 @@ def _send_verification(user, db):
 
 @router.post("/register")
 def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
-    if body.role=="organizer": raise HTTPException(400,"Organizer accounts are provisioned through secure environment configuration.")
+    if body.role=="organizer": raise HTTPException(400,"Organizer accounts can't self-register. The first organizer login is created automatically from the ORGANIZER_BOOTSTRAP_EMAIL / ORGANIZER_BOOTSTRAP_PASSWORD environment variables on startup.")
     if body.role not in ("donor","doctor","hospital"): raise HTTPException(400,"role must be donor, doctor, or hospital")
     if db.query(User).filter(User.email==body.email).first(): raise HTTPException(409,"An account with this email already exists.")
     if not body.full_name.strip(): raise HTTPException(400,"full_name is required")

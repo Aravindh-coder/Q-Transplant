@@ -23,6 +23,14 @@ class Settings:
     OTP_EXPIRY_MINUTES=int(os.environ.get("OTP_EXPIRY_MINUTES",10))
     ORGANIZER_EMAIL=os.environ.get("ORGANIZER_EMAIL","")
     ORGANIZER_APP_PASSWORD=os.environ.get("ORGANIZER_APP_PASSWORD","")
+    # Distinct from the two vars above, which are the Gmail sender account
+    # used to deliver system emails — NOT a platform login. These, if set,
+    # are used once at startup to create the first organizer login if one
+    # doesn't already exist (registration deliberately blocks self-signup
+    # for the organizer role, so without this there is no way to ever get
+    # an organizer account into a fresh production database).
+    ORGANIZER_BOOTSTRAP_EMAIL=os.environ.get("ORGANIZER_BOOTSTRAP_EMAIL","")
+    ORGANIZER_BOOTSTRAP_PASSWORD=os.environ.get("ORGANIZER_BOOTSTRAP_PASSWORD","")
     ALLOWED_ORIGINS=os.environ.get("ALLOWED_ORIGINS","http://localhost:5173").split(",")
     LOGIN_RATE_LIMIT=int(os.environ.get("LOGIN_RATE_LIMIT",10))
     OTP_RATE_LIMIT=int(os.environ.get("OTP_RATE_LIMIT",5))
