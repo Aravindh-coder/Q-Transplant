@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, donors, doctors, hospitals, patients, matching, organizer, devices, emergency, quantum_router, documents, donor_requests, notifications
+from app.routers import auth, donors, doctors, hospitals, patients, matching, organizer, devices, emergency, quantum_router, documents, donor_requests, notifications, users, hla, transplants
 from app.routers import doctor_workflow, hospital_workflow
+from app.services.security_headers import SecurityHeadersMiddleware
 
 def ensure_schema():
  Base.metadata.create_all(bind=engine)
@@ -17,10 +18,11 @@ def ensure_schema():
    for name,typ in cols:
     if name not in existing: conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {typ}"))
 ensure_schema()
-app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.1.0")
-app.add_middleware(CORSMiddleware,allow_origins=settings.ALLOWED_ORIGINS,allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
-for router in (auth.router,donors.router,doctors.router,hospitals.router,patients.router,matching.router,organizer.router,devices.router,emergency.router,quantum_router.router,documents.router,donor_requests.router,notifications.router,doctor_workflow.router,hospital_workflow.router): app.include_router(router)
+app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.2.0")
+app.add_middleware(CORSMiddleware,allow_origins=settings.ALLOWED_ORIGINS,allow_credentials=True,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["Authorization","Content-Type"],max_age=600)
+app.add_middleware(SecurityHeadersMiddleware)
+for router in (auth.router,users.router,donors.router,doctors.router,hospitals.router,patients.router,matching.router,organizer.router,devices.router,emergency.router,quantum_router.router,documents.router,donor_requests.router,notifications.router,hla.router,transplants.router,doctor_workflow.router,hospital_workflow.router): app.include_router(router)
 @app.get("/")
-def root(): return {"service":"Q-Transplant API","status":"online","version":"2.1.0"}
+def root(): return {"service":"Q-Transplant API","status":"online","version":"2.2.0"}
 @app.get("/health")
 def health(): return {"status":"ok"}
