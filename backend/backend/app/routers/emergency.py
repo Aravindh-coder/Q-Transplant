@@ -1,7 +1,4 @@
-"""
-Q-Transplant — Emergency Network
-Persists emergency requests and supports authenticated real-time WebSocket state.
-"""
+"""Q-Transplant emergency coordination and real-time state."""
 import json
 from datetime import datetime, timezone
 from typing import Dict, List
@@ -9,9 +6,10 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPExce
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, get_db
-from app.models import User, HospitalProfile, EmergencyRequest, Device
+from app.models import User, HospitalProfile, EmergencyRequest, Device, DoctorProfile
 from app.security import require_role
 from app.services.audit import log_action
+from app.services.notifications import notify_role, notify_organizer
 
 router = APIRouter(prefix="/api/v1/emergency", tags=["emergency"])
 CONNECTIONS: List[WebSocket] = []
@@ -46,15 +44,16 @@ class EmergencyIn(BaseModel):
 async def create_emergency(body: EmergencyIn, user: User = Depends(require_role("doctor","hospital")), db: Session = Depends(get_db)):
     hospital_id = None
     if user.role == "hospital":
-        h=db.query(HospitalProfile).filter(HospitalProfile.user_id==user.id).first()
-        hospital_id=h.id if h else None
+        h=db.query(HospitalProfile).filter(HospitalProfile.user_id==user.id).first(); hospital_id=h.id if h else None
     else:
-        from app.models import DoctorProfile
-        d=db.query(DoctorProfile).filter(DoctorProfile.user_id==user.id).first()
-        hospital_id=d.hospital_id if d else None
+        d=db.query(DoctorProfile).filter(DoctorProfile.user_id==user.id).first(); hospital_id=d.hospital_id if d else None
     if not hospital_id: raise HTTPException(400,"Your account is not linked to a hospital.")
     req=EmergencyRequest(hospital_id=hospital_id,raised_by=user.id,requirement=body.requirement,status="NOTIFIED")
-    db.add(req); db.commit(); db.refresh(req)
+    db.add(req); db.flush()
+    notify_role(db,"hospital","Emergency request","A transplant emergency requires attention: " + body.requirement,"urgent",True)
+    notify_role(db,"doctor","Emergency request","A transplant emergency requires attention: " + body.requirement,"urgent",True)
+    db.commit()
+    notify_organizer("Q-Transplant — emergency request", f"Emergency raised by {user.full_name}: {body.requirement}")
     log_action(db,"EMERGENCY_CREATED",user_id=user.id,target=req.id,meta={"requirement":body.requirement})
     await broadcast_state()
     return {"id":req.id,"status":req.status,"hospital_id":hospital_id}
@@ -72,8 +71,7 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
     from app.security import verify_password
     if device_token:
         expected=DEVICE_TOKEN_HASHES.get(hospital_id)
-        if not expected or not verify_password(device_token,expected):
-            await websocket.close(code=4401); return
+        if not expected or not verify_password(device_token,expected): await websocket.close(code=4401); return
     await websocket.accept(); CONNECTIONS.append(websocket)
     db=SessionLocal()
     try: await websocket.send_text(json.dumps({"type":"state","hospitals":_hospital_state(db),"timestamp":now_iso()}))
@@ -87,13 +85,15 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
                 hospital=db.query(HospitalProfile).filter(HospitalProfile.id==hid).first()
                 if not hospital: continue
                 if msg.get("type")=="emergency":
-                    req=EmergencyRequest(hospital_id=hid,requirement=msg.get("requirement",""),status="NOTIFIED"); db.add(req); db.commit(); log_action(db,"EMERGENCY_CREATED",target=hid,meta={"requirement":msg.get("requirement","")})
+                    req=EmergencyRequest(hospital_id=hid,requirement=msg.get("requirement",""),status="NOTIFIED"); db.add(req); db.flush()
+                    notify_role(db,"hospital","Emergency request","Emergency requirement: "+req.requirement,"urgent",True); notify_role(db,"doctor","Emergency request","Emergency requirement: "+req.requirement,"urgent",True); db.commit()
+                    notify_organizer("Q-Transplant — emergency request", "Hospital emergency: "+req.requirement)
                 elif msg.get("type")=="requirement_update":
                     req=(db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id==hid,EmergencyRequest.status.notin_(["RESOLVED","CANCELLED"])).order_by(EmergencyRequest.created_at.desc()).first())
                     if req: req.requirement=msg.get("requirement",""); db.commit()
                 elif msg.get("type")=="donor_found":
                     target=msg.get("target_hospital_id"); req=(db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id==target,EmergencyRequest.status.notin_(["RESOLVED","CANCELLED"])).order_by(EmergencyRequest.created_at.desc()).first())
-                    if req: req.responding_hospital_id=hid; req.status="ACKNOWLEDGED"; db.commit(); log_action(db,"MATCH_GENERATED",target=target,meta={"responding_hospital":hid})
+                    if req: req.responding_hospital_id=hid; req.status="ACKNOWLEDGED"; db.commit(); log_action(db,"MATCH_GENERATED",target=target,meta={"responding_hospital":hid}); notify_organizer("Q-Transplant — emergency response", "A hospital has responded to an emergency request.")
                 elif msg.get("type")=="acknowledge":
                     req=(db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id==hid,EmergencyRequest.status.notin_(["RESOLVED","CANCELLED"])).order_by(EmergencyRequest.created_at.desc()).first())
                     if req: req.status="RESOLVED"; req.resolved_at=datetime.now(timezone.utc); db.commit(); log_action(db,"EMERGENCY_ACKNOWLEDGED",target=hid)
