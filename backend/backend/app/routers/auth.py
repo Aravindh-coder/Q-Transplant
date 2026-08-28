@@ -2,31 +2,40 @@ import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
-from app.models import User, OTP, DoctorProfile, HospitalProfile, DonorProfile
-from app.security import hash_password, verify_password, create_access_token, get_current_user, rate_limit
+from app.models import User, OTP, RevokedToken, DoctorProfile, HospitalProfile, DonorProfile
+from app.security import hash_password, verify_password, create_access_token, get_current_user, rate_limit, token_fingerprint
 from app.services.mailer import send_email
 from app.services.audit import log_action
+
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 class RegisterIn(BaseModel):
-    email: EmailStr; password: str; role: str; full_name: str
+    email: EmailStr; password: str = Field(min_length=8); role: str; full_name: str
     phone: Optional[str]=None; address: Optional[str]=None; license_number: Optional[str]=None
     specialty: Optional[str]=None; professional_information: Optional[str]=None; hospital_id: Optional[str]=None
     hospital_name: Optional[str]=None; hospital_code: Optional[str]=None; location: Optional[str]=None
     registration_number: Optional[str]=None; authorized_contact: Optional[str]=None; blood_group: Optional[str]=None
 class LoginIn(BaseModel): email: EmailStr; password: str
-class VerifyEmailIn(BaseModel): email: EmailStr; otp: str
+class VerifyEmailIn(BaseModel): email: EmailStr; otp: str = Field(min_length=6,max_length=6,pattern=r"^\d{6}$")
 class ForgotPasswordIn(BaseModel): email: EmailStr
-class ResetPasswordIn(BaseModel): email: EmailStr; otp: str; new_password: str
+class ResetPasswordIn(BaseModel): email: EmailStr; otp: str = Field(min_length=6,max_length=6,pattern=r"^\d{6}$"); new_password: str = Field(min_length=8)
+
+def _invalidate_otps(db, email, purpose):
+    db.query(OTP).filter(OTP.email==email, OTP.purpose==purpose, OTP.used==False).update({OTP.used:True}, synchronize_session=False)
+
+def _issue_otp(db, email, purpose):
+    _invalidate_otps(db,email,purpose)
+    code=f"{random.SystemRandom().randrange(1000000):06d}"
+    row=OTP(email=email,code_hash=hash_password(code),purpose=purpose,expires_at=datetime.now(timezone.utc)+timedelta(minutes=settings.OTP_EXPIRY_MINUTES))
+    db.add(row); db.commit(); return code
 
 def _send_verification(user, db):
-    code=f"{random.randint(0,999999):06d}"
-    db.add(OTP(email=user.email,code_hash=hash_password(code),purpose="email_verify",expires_at=datetime.now(timezone.utc)+timedelta(minutes=settings.OTP_EXPIRY_MINUTES))); db.commit()
-    try: send_email(user.email,"Q-Transplant — verify your email",f"Your Q-Transplant verification code is {code}. It expires in {settings.OTP_EXPIRY_MINUTES} minutes. Do not share this code.")
-    except RuntimeError: pass
+    code=_issue_otp(db,user.email,"email_verify")
+    send_email(user.email,"Q-Transplant — verify your email",f"Your Q-Transplant verification code is {code}. It expires in {settings.OTP_EXPIRY_MINUTES} minutes. Do not share this code.")
+
 @router.post("/register")
 def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
     if body.role=="organizer": raise HTTPException(400,"Organizer accounts are provisioned through secure environment configuration.")
@@ -37,41 +46,44 @@ def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
     if body.role=="doctor" and (not body.phone or not body.address or not body.license_number or not body.specialty or not body.professional_information): raise HTTPException(400,"Doctor registration requires phone, address, license_number, specialty and professional_information. Profile photo and medical certificate must be uploaded before approval.")
     if body.role=="hospital" and (not body.hospital_name or not body.hospital_code or not body.phone or not body.address or not body.location or not body.registration_number or not body.authorized_contact): raise HTTPException(400,"Hospital registration requires all institutional fields.")
     status="unverified" if body.role=="donor" else "pending"
-    user=User(email=body.email,hashed_password=hash_password(body.password),role=body.role,full_name=body.full_name,status=status,email_verified=False)
+    user=User(email=body.email,hashed_password=hash_password(body.password),role=body.role,full_name=body.full_name.strip(),status=status,email_verified=False)
     db.add(user); db.commit(); db.refresh(user)
     if body.role=="doctor": db.add(DoctorProfile(user_id=user.id,license_number=body.license_number,phone=body.phone,address=body.address,specialty=body.specialty,professional_information=body.professional_information,hospital_id=body.hospital_id,approval_status="PENDING_APPROVAL"))
     elif body.role=="hospital": db.add(HospitalProfile(user_id=user.id,hospital_name=body.hospital_name,hospital_code=body.hospital_code,phone=body.phone,address=body.address,location=body.location,registration_number=body.registration_number,authorized_contact=body.authorized_contact,verification_status="pending"))
     else: db.add(DonorProfile(user_id=user.id,blood_group=body.blood_group.upper(),phone=body.phone,address=body.address,donation_status="ACTIVE"))
     db.commit(); log_action(db,"REGISTER",user_id=user.id,target=body.role.upper(),ip_address=request.client.host if request.client else None)
-    if body.role=="donor": _send_verification(user,db)
-    elif body.role=="doctor":
-        try:
+    try:
+        if body.role=="donor": _send_verification(user,db)
+        elif body.role=="doctor":
             send_email(body.email,"Q-Transplant — registration received","Your doctor registration was received and is pending organizer review. Complete the mandatory profile photo and medical certificate upload before approval.")
-            send_email(settings.ORGANIZER_EMAIL,"Q-Transplant — new doctor pending approval",f"{body.full_name} registered as a doctor. License: {body.license_number}. Mandatory documents must be reviewed in the organizer portal.")
-        except RuntimeError: pass
-    elif body.role=="hospital":
-        try: send_email(body.email,"Q-Transplant — hospital registration received","Your hospital registration was received and is pending verification.")
-        except RuntimeError: pass
+            if settings.ORGANIZER_EMAIL: send_email(settings.ORGANIZER_EMAIL,"Q-Transplant — new doctor pending approval",f"{body.full_name} registered as a doctor. License: {body.license_number}. Review the submitted registration.")
+        elif body.role=="hospital" and settings.ORGANIZER_EMAIL: send_email(body.email,"Q-Transplant — registration received","Your hospital registration was received and is pending verification.")
+    except RuntimeError:
+        pass
     return {"id":user.id,"status":user.status,"email_verification_required":body.role=="donor","approval_required":body.role in ("doctor","hospital")}
-@router.post("/verify-email",dependencies=[Depends(rate_limit("otp",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
+
+@router.post("/verify-email",dependencies=[Depends(rate_limit("otp_verify",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def verify_email(body:VerifyEmailIn,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()
-    if not user: raise HTTPException(404,"Account not found.")
     row=db.query(OTP).filter(OTP.email==body.email,OTP.used==False,OTP.purpose=="email_verify").order_by(OTP.created_at.desc()).first()
-    if not row or row.expires_at<datetime.now(timezone.utc) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired verification OTP.")
+    if not user or not row or row.expires_at<datetime.now(timezone.utc) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired verification OTP.")
     row.used=True; user.email_verified=True
     if user.role=="donor": user.status="active"
     db.commit(); log_action(db,"EMAIL_VERIFIED",user_id=user.id); return {"message":"Email verified successfully.","status":user.status}
-@router.post("/resend-verification",dependencies=[Depends(rate_limit("otp",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
+
+@router.post("/resend-verification",dependencies=[Depends(rate_limit("otp_resend",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def resend_verification(body:ForgotPasswordIn,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()
-    if user and not user.email_verified: _send_verification(user,db)
+    if user and not user.email_verified:
+        try: _send_verification(user,db)
+        except RuntimeError: pass
     return {"message":"If the account exists and is unverified, a verification OTP has been sent."}
+
 @router.post("/login",dependencies=[Depends(rate_limit("login",settings.LOGIN_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()
     if not user or not verify_password(body.password,user.hashed_password): raise HTTPException(401,"Incorrect email or password.")
-    if user.status=="suspended": raise HTTPException(403,"This account has been suspended.")
+    if user.status in ("suspended","inactive"): raise HTTPException(403,"This account is not active.")
     if not user.email_verified: raise HTTPException(403,"Verify your email before logging in.")
     if user.role=="doctor":
         p=db.query(DoctorProfile).filter(DoctorProfile.user_id==user.id).first()
@@ -79,18 +91,30 @@ def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
     if user.role=="hospital" and user.status!="active": raise HTTPException(403,"Hospital account is awaiting verification.")
     log_action(db,"LOGIN",user_id=user.id,ip_address=request.client.host if request.client else None)
     return {"access_token":create_access_token(user),"token_type":"bearer","role":user.role,"user_id":user.id}
-@router.post("/forgot-password",dependencies=[Depends(rate_limit("otp",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
+
+@router.post("/logout")
+def logout(token:str=Depends(__import__("app.security",fromlist=["oauth2_scheme"]).oauth2_scheme),user:User=Depends(get_current_user),db:Session=Depends(get_db)):
+    try: payload=__import__("jwt").decode(token,settings.JWT_SECRET,algorithms=[settings.JWT_ALGO]); exp=datetime.fromtimestamp(payload["exp"],tz=timezone.utc)
+    except Exception: exp=datetime.now(timezone.utc)+timedelta(minutes=1)
+    if not db.query(RevokedToken).filter(RevokedToken.token_jti==token_fingerprint(token)).first(): db.add(RevokedToken(token_jti=token_fingerprint(token),expires_at=exp)); db.commit()
+    log_action(db,"LOGOUT",user_id=user.id); return {"message":"Logged out successfully."}
+
+@router.post("/forgot-password",dependencies=[Depends(rate_limit("password_reset",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def forgot_password(body:ForgotPasswordIn,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()
     if user:
-        code=f"{random.randint(0,999999):06d}"; db.add(OTP(email=body.email,code_hash=hash_password(code),purpose="password_reset",expires_at=datetime.now(timezone.utc)+timedelta(minutes=settings.OTP_EXPIRY_MINUTES))); db.commit()
-        try: send_email(body.email,"Q-Transplant — password reset OTP",f"Your one-time code is {code}. It expires in {settings.OTP_EXPIRY_MINUTES} minutes.")
+        code=_issue_otp(db,body.email,"password_reset")
+        try: send_email(body.email,"Q-Transplant — password reset OTP",f"Your one-time code is {code}. It expires in {settings.OTP_EXPIRY_MINUTES} minutes. If you did not request this, ignore this email.")
         except RuntimeError: pass
     return {"message":"If that email is registered, an OTP has been sent."}
-@router.post("/reset-password")
+
+@router.post("/reset-password",dependencies=[Depends(rate_limit("password_reset_verify",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def reset_password(body:ResetPasswordIn,db:Session=Depends(get_db)):
-    row=db.query(OTP).filter(OTP.email==body.email,OTP.used==False,OTP.purpose=="password_reset").order_by(OTP.expires_at.desc()).first(); user=db.query(User).filter(User.email==body.email).first()
+    row=db.query(OTP).filter(OTP.email==body.email,OTP.used==False,OTP.purpose=="password_reset").order_by(OTP.created_at.desc()).first(); user=db.query(User).filter(User.email==body.email).first()
     if not row or not user or row.expires_at<datetime.now(timezone.utc) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired OTP.")
-    user.hashed_password=hash_password(body.new_password); row.used=True; db.commit(); return {"message":"Password updated."}
+    user.hashed_password=hash_password(body.new_password); row.used=True
+    db.query(OTP).filter(OTP.email==body.email,OTP.purpose=="password_reset",OTP.used==False).update({OTP.used:True},synchronize_session=False)
+    db.commit(); log_action(db,"PASSWORD_RESET",user_id=user.id); return {"message":"Password updated successfully."}
+
 @router.get("/me")
 def me(user:User=Depends(get_current_user)): return {"id":user.id,"email":user.email,"role":user.role,"status":user.status,"email_verified":user.email_verified}
