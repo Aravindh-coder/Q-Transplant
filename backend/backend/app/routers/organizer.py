@@ -24,7 +24,7 @@ def approve_doctor(doctor_id,user=Depends(require_role("organizer")),db:Session=
  d=db.query(DoctorProfile).filter(DoctorProfile.id==doctor_id).first()
  if not d: raise HTTPException(404,"Doctor profile not found")
  if not d.photo_document_id or not d.certificate_document_id: raise HTTPException(400,"Doctor photo and medical certificate are mandatory before approval")
- d.approval_status="APPROVED"; account=db.query(User).filter(User.id==d.user_id).first(); account.status="active"; db.commit(); notify(db,account,"Doctor account approved","Your doctor account has been approved.",priority="high",also_email=True); log_action(db,"DOCTOR_APPROVED",user_id=user.id,target=doctor_id); return {"id":d.id,"approval_status":d.approval_status}
+ d.approval_status="APPROVED"; account=db.query(User).filter(User.id==d.user_id).first(); account.status="active"; account.email_verified=True; db.commit(); notify(db,account,"Doctor account approved","Your doctor account has been approved.",priority="high",also_email=True); log_action(db,"DOCTOR_APPROVED",user_id=user.id,target=doctor_id); return {"id":d.id,"approval_status":d.approval_status}
 @router.post("/doctors/{doctor_id}/reject")
 def reject_doctor(doctor_id,reason="",user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  d=db.query(DoctorProfile).filter(DoctorProfile.id==doctor_id).first()
@@ -39,7 +39,7 @@ def request_doctor_information(doctor_id,message="Please provide the requested a
 def verify_hospital(hospital_id,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  h=db.query(HospitalProfile).filter(HospitalProfile.id==hospital_id).first()
  if not h: raise HTTPException(404,"Hospital not found")
- h.verification_status="verified"; a=db.query(User).filter(User.id==h.user_id).first(); a.status="active"; db.commit(); notify(db,a,"Hospital verification approved","Your hospital account is verified.",priority="high",also_email=True); log_action(db,"HOSPITAL_VERIFIED",user_id=user.id,target=hospital_id); return {"id":h.id,"verification_status":h.verification_status}
+ h.verification_status="verified"; a=db.query(User).filter(User.id==h.user_id).first(); a.status="active"; a.email_verified=True; db.commit(); notify(db,a,"Hospital verification approved","Your hospital account is verified.",priority="high",also_email=True); log_action(db,"HOSPITAL_VERIFIED",user_id=user.id,target=hospital_id); return {"id":h.id,"verification_status":h.verification_status}
 @router.get("/users")
 def users(role:str|None=None,search:str|None=None,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  q=db.query(User)

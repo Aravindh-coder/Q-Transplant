@@ -60,7 +60,15 @@ def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
         elif body.role=="hospital" and settings.ORGANIZER_EMAIL: send_email(body.email,"Q-Transplant — registration received","Your hospital registration was received and is pending verification.")
     except RuntimeError:
         pass
-    return {"id":user.id,"status":user.status,"email_verification_required":body.role=="donor","approval_required":body.role in ("doctor","hospital")}
+    response={"id":user.id,"status":user.status,"email_verification_required":body.role=="donor","approval_required":body.role in ("doctor","hospital")}
+    if body.role in ("doctor","hospital"):
+        # Normal /login is blocked until organizer approval, but the doctor
+        # still needs to submit their photo/certificate (and a hospital its
+        # license) for the organizer to review in the first place. This
+        # token is scoped by its short expiry, not by role — it works
+        # exactly like a normal token for this account, just for 30 minutes.
+        response["upload_token"]=create_access_token(user,minutes=30)
+    return response
 
 @router.post("/verify-email",dependencies=[Depends(rate_limit("otp_verify",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def verify_email(body:VerifyEmailIn,db:Session=Depends(get_db)):

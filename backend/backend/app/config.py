@@ -31,6 +31,11 @@ class Settings:
     # an organizer account into a fresh production database).
     ORGANIZER_BOOTSTRAP_EMAIL=os.environ.get("ORGANIZER_BOOTSTRAP_EMAIL","")
     ORGANIZER_BOOTSTRAP_PASSWORD=os.environ.get("ORGANIZER_BOOTSTRAP_PASSWORD","")
+    # Optional. Enables AI-assisted (never authoritative) comparison of a
+    # doctor's live selfie against their license/certificate photo during
+    # onboarding. Without it, uploads still work — the organizer just sees
+    # "not_run" and reviews the two images manually.
+    ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY","")
     ALLOWED_ORIGINS=os.environ.get("ALLOWED_ORIGINS","http://localhost:5173").split(",")
     LOGIN_RATE_LIMIT=int(os.environ.get("LOGIN_RATE_LIMIT",10))
     OTP_RATE_LIMIT=int(os.environ.get("OTP_RATE_LIMIT",5))

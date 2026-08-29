@@ -26,9 +26,9 @@ def verify_password(pw: str, hashed: str) -> bool:
 def token_fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
-def create_access_token(user: User) -> str:
+def create_access_token(user: User, minutes: int | None = None) -> str:
     payload = {"sub": user.id, "email": user.email, "role": user.role,
-               "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_MINUTES)}
+               "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes if minutes is not None else settings.ACCESS_TOKEN_MINUTES)}
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGO)
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:

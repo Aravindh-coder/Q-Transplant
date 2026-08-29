@@ -16,7 +16,7 @@ PUBLIC_DIR=os.path.join(BASE_DIR,"public")
 
 def ensure_schema():
  Base.metadata.create_all(bind=engine)
- additions={"donor_profiles":[("medical_information","TEXT"),("donation_status","VARCHAR(64) DEFAULT 'ACTIVE'")],"doctor_profiles":[("professional_information","TEXT"),("photo_document_id","VARCHAR(64)"),("certificate_document_id","VARCHAR(64)")],"hospital_profiles":[("location","TEXT"),("registration_number","VARCHAR(255)"),("authorized_contact","VARCHAR(255)")]}
+ additions={"donor_profiles":[("medical_information","TEXT"),("donation_status","VARCHAR(64) DEFAULT 'ACTIVE'")],"doctor_profiles":[("professional_information","TEXT"),("photo_document_id","VARCHAR(64)"),("certificate_document_id","VARCHAR(64)"),("identity_check_result","TEXT"),("identity_check_confidence","VARCHAR(32)")],"hospital_profiles":[("location","TEXT"),("registration_number","VARCHAR(255)"),("authorized_contact","VARCHAR(255)")]}
  inspector=inspect(engine)
  with engine.begin() as conn:
   for table,cols in additions.items():
