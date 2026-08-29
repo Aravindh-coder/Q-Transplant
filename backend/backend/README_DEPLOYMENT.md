@@ -18,12 +18,15 @@
   bootstrap only ever creates the first organizer and never overwrites an
   existing one. Deliberately distinct from `ORGANIZER_EMAIL` above, which
   is only an SMTP sender identity, not a login.
-- `ANTHROPIC_API_KEY` (optional): enables AI-assisted comparison of a
-  doctor's live selfie against their submitted certificate photo during
-  onboarding. Without it, document upload still works fine — the organizer
-  just sees "not run" in the approvals table and reviews the two images
-  manually instead. This check is always assistive, never authoritative;
-  the organizer makes the actual approve/reject decision either way.
+- `GROQ_API_KEY` / `ANTHROPIC_API_KEY` (both optional): enable AI-assisted
+  comparison of a doctor's live selfie against their submitted certificate
+  photo during onboarding. If `GROQ_API_KEY` is set it's used (faster and
+  cheaper for most accounts, via Groq's current vision model); otherwise
+  `ANTHROPIC_API_KEY` is used if present. Without either set, document
+  upload still works fine — the organizer just sees "not run" in the
+  approvals table and reviews the two images manually instead. This check
+  is always assistive, never authoritative; the organizer makes the actual
+  approve/reject decision either way.
 - `ALLOWED_ORIGINS`: comma-separated production frontend origins. Since the
   frontend (`public/`) is now served by this same FastAPI app, this is only
   needed if something else (an emergency device, a separate admin panel,

@@ -33,8 +33,11 @@ class Settings:
     ORGANIZER_BOOTSTRAP_PASSWORD=os.environ.get("ORGANIZER_BOOTSTRAP_PASSWORD","")
     # Optional. Enables AI-assisted (never authoritative) comparison of a
     # doctor's live selfie against their license/certificate photo during
-    # onboarding. Without it, uploads still work — the organizer just sees
-    # "not_run" and reviews the two images manually.
+    # onboarding. Without either key set, uploads still work -- the
+    # organizer just sees "not_run" and reviews the two images manually.
+    # If GROQ_API_KEY is set it's used (faster/cheaper); otherwise
+    # ANTHROPIC_API_KEY is used if present.
+    GROQ_API_KEY=os.environ.get("GROQ_API_KEY","")
     ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY","")
     ALLOWED_ORIGINS=os.environ.get("ALLOWED_ORIGINS","http://localhost:5173").split(",")
     LOGIN_RATE_LIMIT=int(os.environ.get("LOGIN_RATE_LIMIT",10))
