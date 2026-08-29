@@ -8,6 +8,8 @@ from app.database import get_db
 from app.models import User, DonorProfile, Document
 from app.security import require_role
 from app.services.audit import log_action
+from app.services.search_service import paginate
+from app.services.performance import bounded_page, DEFAULT_PAGE_SIZE
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/donors", tags=["donors"])
@@ -109,12 +111,21 @@ def update_donation_status(donor_id: str, body: DonationStatusIn,
 
 @router.get("/search")
 def search_donors(organ: Optional[str] = None, blood_group: Optional[str] = None,
+                 page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
                  user: User = Depends(require_role("doctor", "hospital", "organizer")),
                  db: Session = Depends(get_db)):
+    page, page_size = bounded_page(page, page_size)
     q = db.query(DonorProfile).filter(DonorProfile.availability_status == "active")
     if blood_group:
         q = q.filter(DonorProfile.blood_group == blood_group.upper())
-    results = q.all()
     if organ:
-        results = [d for d in results if any(o.replace("_partial", "") == organ.lower() for o in (d.organs_available or []))]
-    return to_dict_list(results)
+        # organs_available is a JSON column, so this filter can't run in SQL
+        # portably across SQLite/Postgres -- bounded pre-fetch keeps this
+        # from ever loading an unbounded table into memory.
+        candidates = q.limit(2000).all()
+        results = [d for d in candidates if any(o.replace("_partial", "") == organ.lower() for o in (d.organs_available or []))]
+        total = len(results)
+        page_items = results[(page - 1) * page_size: page * page_size]
+        return {"items": to_dict_list(page_items, exclude={"medical_information"}), "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size}
+    paginated = paginate(q, page, page_size)
+    return {**paginated, "items": to_dict_list(paginated["items"], exclude={"medical_information"})}

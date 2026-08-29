@@ -9,6 +9,8 @@ from app.models import User, DoctorProfile, HospitalProfile
 from app.security import get_current_user, require_role
 from app.services.audit import log_action
 from app.services.notifications import notify
+from app.services.search_service import paginate
+from app.services.performance import bounded_page, DEFAULT_PAGE_SIZE
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/doctors", tags=["doctors"])
@@ -44,10 +46,12 @@ def get_my_profile(user: User = Depends(require_role("doctor")), db: Session = D
 
 
 @router.get("")
-def list_doctors(hospital_id: Optional[str] = None,
+def list_doctors(hospital_id: Optional[str] = None, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
                   user: User = Depends(require_role("hospital", "organizer")),
                   db: Session = Depends(get_db)):
+    page, page_size = bounded_page(page, page_size)
     q = db.query(DoctorProfile)
     if hospital_id:
         q = q.filter(DoctorProfile.hospital_id == hospital_id)
-    return to_dict_list(q.all())
+    paginated = paginate(q, page, page_size)
+    return {**paginated, "items": to_dict_list(paginated["items"])}

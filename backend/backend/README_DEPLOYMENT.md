@@ -36,7 +36,7 @@
 ## Production requirements
 1. Run behind HTTPS and a reverse proxy/load balancer.
 2. Use PostgreSQL and a real migration tool (Alembic recommended) instead of runtime schema creation.
-3. Store uploads in private object storage or an encrypted private volume; serve through authorized backend download endpoints.
+3. Store uploads in private object storage or an encrypted private volume; serve through authorized backend download endpoints. **This matters immediately on Render specifically**: Render's filesystem is ephemeral, so every doctor photo/certificate and hospital license document uploaded to `uploads/` is wiped on the next deploy or restart. Until this moves to object storage (e.g. S3-compatible storage), assume uploaded documents don't survive a redeploy.
 4. Run periodic encrypted database and document backups and test restoration regularly.
 5. Run API workers behind a process manager/container platform.
 6. Put long-running matching, email and backup work on a background worker/queue in production.

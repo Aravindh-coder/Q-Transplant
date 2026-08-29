@@ -10,6 +10,7 @@ from app.models import User, OTP, RevokedToken, DoctorProfile, HospitalProfile, 
 from app.security import hash_password, verify_password, create_access_token, get_current_user, rate_limit, token_fingerprint
 from app.services.mailer import send_email
 from app.services.audit import log_action
+from app.services.observability import safe_event
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 class RegisterIn(BaseModel):
@@ -90,7 +91,9 @@ def resend_verification(body:ForgotPasswordIn,db:Session=Depends(get_db)):
 @router.post("/login",dependencies=[Depends(rate_limit("login",settings.LOGIN_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()
-    if not user or not verify_password(body.password,user.hashed_password): raise HTTPException(401,"Incorrect email or password.")
+    if not user or not verify_password(body.password,user.hashed_password):
+        safe_event("login_failed",email=body.email,reason="invalid_credentials")
+        raise HTTPException(401,"Incorrect email or password.")
     if user.status in ("suspended","inactive"): raise HTTPException(403,"This account is not active.")
     if not user.email_verified: raise HTTPException(403,"Verify your email before logging in.")
     if user.role=="doctor":
@@ -98,6 +101,7 @@ def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
         if not p or p.approval_status!="APPROVED": raise HTTPException(403,"Doctor account is awaiting organizer approval.")
     if user.role=="hospital" and user.status!="active": raise HTTPException(403,"Hospital account is awaiting verification.")
     log_action(db,"LOGIN",user_id=user.id,ip_address=request.client.host if request.client else None)
+    safe_event("login_success",user_id=user.id,role=user.role)
     return {"access_token":create_access_token(user),"token_type":"bearer","role":user.role,"user_id":user.id}
 
 @router.post("/logout")

@@ -10,7 +10,9 @@ from app.database import Base, engine
 from app.routers import auth, donors, doctors, hospitals, patients, matching, organizer, devices, emergency, quantum_router, documents, donor_requests, notifications, users, hla, transplants
 from app.routers import doctor_workflow, hospital_workflow
 from app.services.security_headers import SecurityHeadersMiddleware
+from app.services.observability import configure_logging, safe_event
 
+configure_logging()
 logger=logging.getLogger("qtransplant.startup")
 PUBLIC_DIR=os.path.join(BASE_DIR,"public")
 
@@ -54,6 +56,33 @@ except Exception:
 app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.2.0")
 app.add_middleware(CORSMiddleware,allow_origins=settings.ALLOWED_ORIGINS,allow_credentials=True,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["Authorization","Content-Type"],max_age=600)
 app.add_middleware(SecurityHeadersMiddleware)
+
+_STATUS_CODES={400:"BAD_REQUEST",401:"UNAUTHORIZED",403:"FORBIDDEN",404:"NOT_FOUND",405:"METHOD_NOT_ALLOWED",409:"CONFLICT",413:"PAYLOAD_TOO_LARGE",422:"VALIDATION_ERROR",429:"RATE_LIMITED"}
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import HTTPException as StarletteHTTPException, RequestValidationError
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(request:Request,exc:StarletteHTTPException):
+    code=_STATUS_CODES.get(exc.status_code,f"HTTP_{exc.status_code}")
+    return JSONResponse(status_code=exc.status_code,content={"success":False,"error":{"code":code,"message":exc.detail}},headers=getattr(exc,"headers",None))
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request:Request,exc:RequestValidationError):
+    # Pydantic's default 422 body is a list of field errors -- flatten to
+    # one readable message while keeping the same structured shape as
+    # every other error response.
+    first=exc.errors()[0] if exc.errors() else {}
+    field=".".join(str(p) for p in first.get("loc",[]) if p not in ("body","query","path"))
+    message=(f"{field}: {first.get('msg','Invalid request')}" if field else first.get("msg","Invalid request"))
+    return JSONResponse(status_code=422,content={"success":False,"error":{"code":"VALIDATION_ERROR","message":message}})
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request:Request,exc:Exception):
+    logger.exception("Unhandled exception on %s %s",request.method,request.url.path)
+    return JSONResponse(status_code=500,content={"success":False,"error":{"code":"INTERNAL_ERROR","message":"Something went wrong on our end. Please try again."}})
+
 for router in (auth.router,users.router,donors.router,doctors.router,hospitals.router,patients.router,matching.router,organizer.router,devices.router,emergency.router,quantum_router.router,documents.router,donor_requests.router,notifications.router,hla.router,transplants.router,doctor_workflow.router,hospital_workflow.router): app.include_router(router)
 @app.get("/api")
 def api_status(): return {"service":"Q-Transplant API","status":"online","version":"2.2.0"}

@@ -6,10 +6,19 @@ from app.security import require_role
 from app.services.audit import log_action
 from app.services.matching_engine import run_match
 from app.services.clinical_safety import decision_support_payload
+from app.services.ai_assistant import risk_flags, summarize_match
+from app.services.match_workflow import workflow_plan
 from app.services.notifications import notify, notify_organizer
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/matching", tags=["matching"])
+
+@router.get("/workflow")
+def get_workflow_plan():
+    """Public-shape description of the matching pipeline stages, for API
+    documentation and frontend transparency (section 21/37 of the spec:
+    every result should be explainable, including how it was produced)."""
+    return workflow_plan()
 
 def _donor_to_dict(d):
     return {"id":d.id,"blood_group":d.blood_group,"organs_available":d.organs_available or [],"availability_status":d.availability_status,"hla_a":d.hla_a,"hla_b":d.hla_b,"hla_c":d.hla_c,"hla_dr":d.hla_dr,"hla_dq":d.hla_dq}
@@ -30,6 +39,10 @@ def run_match_for_patient(patient_id: str, user: User = Depends(require_role("do
     donors=db.query(DonorProfile).filter(DonorProfile.availability_status=="active",DonorProfile.donation_status=="ACTIVE").all()
     result=run_match([_donor_to_dict(d) for d in donors],_patient_to_dict(patient))
     result["matches"]=[{**m,**decision_support_payload(m)} for m in result["matches"]]
+    for m in result["matches"]:
+        # AI-assist layer: flags and phrasing only, never re-scores or
+        # re-ranks -- the deterministic engine above has already decided.
+        m["ai_assist"]={"risk_flags":risk_flags(m),"summary":summarize_match(m)}
     req=MatchRequest(patient_id=patient.id,requested_by=user.id,organ=patient.required_organ,status="completed"); db.add(req); db.flush()
     for m in result["matches"]:
         db.add(MatchResult(match_request_id=req.id,donor_id=m["donor_id"],blood_compatible=m["blood_compatible"],hla_score=m["hla_score"],organ_compatible=m["organ_compatible"],urgency_at_match=m["urgency"],overall_score=m["score"],explanation=m,rank=m["rank"]))
