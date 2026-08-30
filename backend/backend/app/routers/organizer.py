@@ -5,6 +5,8 @@ from app.models import User, DoctorProfile, DonorProfile, HospitalProfile, Patie
 from app.security import require_role
 from app.services.audit import log_action
 from app.services.notifications import notify
+from app.services.search_service import paginate
+from app.services.performance import bounded_page, DEFAULT_PAGE_SIZE
 from app.utils import to_dict, to_dict_list
 router=APIRouter(prefix="/api/v1/organizer",tags=["organizer"])
 
@@ -41,11 +43,13 @@ def verify_hospital(hospital_id,user=Depends(require_role("organizer")),db:Sessi
  if not h: raise HTTPException(404,"Hospital not found")
  h.verification_status="verified"; a=db.query(User).filter(User.id==h.user_id).first(); a.status="active"; a.email_verified=True; db.commit(); notify(db,a,"Hospital verification approved","Your hospital account is verified.",priority="high",also_email=True); log_action(db,"HOSPITAL_VERIFIED",user_id=user.id,target=hospital_id); return {"id":h.id,"verification_status":h.verification_status}
 @router.get("/users")
-def users(role:str|None=None,search:str|None=None,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+def users(role:str|None=None,search:str|None=None,page:int=1,page_size:int=DEFAULT_PAGE_SIZE,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ page,page_size=bounded_page(page,page_size)
  q=db.query(User)
  if role: q=q.filter(User.role==role)
  if search: q=q.filter((User.email.ilike(f"%{search}%"))|(User.full_name.ilike(f"%{search}%")))
- return to_dict_list(q.order_by(User.created_at.desc()).all())
+ paginated=paginate(q.order_by(User.created_at.desc()),page,page_size)
+ return {**paginated,"items":to_dict_list(paginated["items"])}
 @router.post("/users/{target_user_id}/activate")
 def activate_user(target_user_id,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  t=db.query(User).filter(User.id==target_user_id).first()
@@ -74,10 +78,19 @@ def user_history(target_user_id,user=Depends(require_role("organizer")),db:Sessi
 def stats(user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  return {"total_donors":db.query(DonorProfile).count(),"active_donors":db.query(DonorProfile).filter(DonorProfile.availability_status=="active").count(),"total_recipients":db.query(Patient).count(),"active_cases":db.query(TransplantCase).filter(TransplantCase.stage.notin_(["COMPLETED","CANCELLED","REJECTED"])).count(),"registered_hospitals":db.query(HospitalProfile).count(),"approved_doctors":db.query(DoctorProfile).filter(DoctorProfile.approval_status.in_(["approved","APPROVED"])).count(),"pending_doctors":db.query(DoctorProfile).filter(DoctorProfile.approval_status.in_(["pending","PENDING_APPROVAL","ORGANIZER_REVIEW","REQUESTED_INFO"])).count(),"emergency_requests":db.query(EmergencyRequest).count(),"matching_requests":db.query(MatchRequest).count(),"successful_matches":db.query(MatchResult).filter(MatchResult.overall_score>=80).count(),"completed_transplant_cases":db.query(TransplantCase).filter(TransplantCase.stage=="COMPLETED").count()}
 @router.get("/transplant-cases")
-def transplant_cases(user=Depends(require_role("organizer")),db:Session=Depends(get_db)): return to_dict_list(db.query(TransplantCase).order_by(TransplantCase.created_at.desc()).all())
+def transplant_cases(page:int=1,page_size:int=DEFAULT_PAGE_SIZE,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ page,page_size=bounded_page(page,page_size)
+ paginated=paginate(db.query(TransplantCase).order_by(TransplantCase.created_at.desc()),page,page_size)
+ return {**paginated,"items":to_dict_list(paginated["items"])}
 @router.get("/emergencies")
-def emergencies(user=Depends(require_role("organizer")),db:Session=Depends(get_db)): return to_dict_list(db.query(EmergencyRequest).order_by(EmergencyRequest.created_at.desc()).all())
+def emergencies(page:int=1,page_size:int=DEFAULT_PAGE_SIZE,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ page,page_size=bounded_page(page,page_size)
+ paginated=paginate(db.query(EmergencyRequest).order_by(EmergencyRequest.created_at.desc()),page,page_size)
+ return {**paginated,"items":to_dict_list(paginated["items"])}
 @router.get("/matching-requests")
-def matching_requests(user=Depends(require_role("organizer")),db:Session=Depends(get_db)): return to_dict_list(db.query(MatchRequest).order_by(MatchRequest.created_at.desc()).all())
+def matching_requests(page:int=1,page_size:int=DEFAULT_PAGE_SIZE,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ page,page_size=bounded_page(page,page_size)
+ paginated=paginate(db.query(MatchRequest).order_by(MatchRequest.created_at.desc()),page,page_size)
+ return {**paginated,"items":to_dict_list(paginated["items"])}
 @router.get("/audit-log")
 def audit_log(limit:int=100,user=Depends(require_role("organizer")),db:Session=Depends(get_db)): return to_dict_list(db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all())

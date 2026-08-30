@@ -42,3 +42,11 @@ def organizer_token(client):
 import uuid
 def unique_email(prefix="user"):
     return f"{prefix}-{uuid.uuid4().hex[:10]}@example.com"
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    from app.security import _hits
+    _hits.clear()
+    yield
+    _hits.clear()

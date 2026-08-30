@@ -236,3 +236,62 @@ def test_upload_rejects_oversized_file(client):
     r = client.post("/api/v1/documents?kind=certificate", headers=headers,
                      files={"file": ("big.pdf", oversized, "application/pdf")})
     assert r.status_code == 413
+
+
+# ---------- doctor rejection (spec section 41) ----------
+
+def test_doctor_rejection_blocks_login(client, organizer_token):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    jpeg = _tiny_jpeg_bytes()
+    client.post("/api/v1/documents?kind=photo", headers=headers, files={"file": ("selfie.jpg", jpeg, "image/jpeg")})
+    client.post("/api/v1/documents?kind=certificate", headers=headers, files={"file": ("cert.jpg", jpeg, "image/jpeg")})
+
+    pending = client.get("/api/v1/organizer/doctors/pending", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(p for p in pending if p["doctor"]["license_number"] == f"LIC-{email.split(chr(64))[0]}")
+    doctor_id = entry["doctor"]["id"]
+
+    reject = client.post(f"/api/v1/organizer/doctors/{doctor_id}/reject",
+                          params={"reason": "License could not be verified"},
+                          headers={"Authorization": f"Bearer {organizer_token}"})
+    assert reject.status_code == 200
+    assert reject.json()["approval_status"] == "REJECTED"
+
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DoctorPass123!"})
+    assert login.status_code == 403
+
+
+# ---------- pagination shape on the previously-unbounded endpoints ----------
+
+def test_hospital_listing_is_paginated(client, organizer_token):
+    r = client.get("/api/v1/hospitals", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    assert set(r.json().keys()) >= {"items", "page", "page_size", "total", "pages"}
+
+def test_organizer_users_listing_is_paginated(client, organizer_token):
+    r = client.get("/api/v1/organizer/users", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    assert set(r.json().keys()) >= {"items", "page", "page_size", "total", "pages"}
+
+
+# ---------- quantum comparison actually runs on live matches (spec 20/37) ----------
+
+def test_matching_engine_includes_quantum_comparison():
+    from app.services.matching_engine import run_match
+    donors = [{"id": "d1", "blood_group": "O+", "organs_available": ["kidney"], "availability_status": "active",
+               "hla_a": "A1,A2", "hla_b": "B7,B8", "hla_c": "C1,C2", "hla_dr": "DR1,DR2", "hla_dq": "DQ1,DQ2"}]
+    patient = {"id": "p1", "blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH", "waiting_since": None,
+               "eligible": True, "hla_a": "A1,A2", "hla_b": "B7,B8", "hla_c": "C1,C2", "hla_dr": "DR1,DR2", "hla_dq": "DQ1,DQ2"}
+    result = run_match(donors, patient)
+    assert result["quantum_comparison"] is not None
+    assert "classical_evaluations" in result["quantum_comparison"]
+    assert "quantum_inspired_evaluations" in result["quantum_comparison"]
+
+
+# ---------- AI match summary falls back gracefully with no key configured ----------
+
+def test_ai_match_summary_falls_back_without_api_key():
+    from app.services.ai_assistant import summarize_match
+    result = summarize_match({"rank": 1, "score": 92, "hla_score": 85, "urgency": "HIGH"})
+    assert "92" in result or "score" in result.lower()

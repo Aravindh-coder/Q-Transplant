@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, HospitalProfile
 from app.security import require_role
+from app.services.search_service import paginate
+from app.services.performance import bounded_page, DEFAULT_PAGE_SIZE
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/hospitals", tags=["hospitals"])
@@ -41,5 +43,8 @@ def get_my_profile(user: User = Depends(require_role("hospital")), db: Session =
 
 
 @router.get("")
-def list_hospitals(user: User = Depends(require_role("doctor", "hospital", "organizer")), db: Session = Depends(get_db)):
-    return to_dict_list(db.query(HospitalProfile).all())
+def list_hospitals(page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
+                    user: User = Depends(require_role("doctor", "hospital", "organizer")), db: Session = Depends(get_db)):
+    page, page_size = bounded_page(page, page_size)
+    paginated = paginate(db.query(HospitalProfile), page, page_size)
+    return {**paginated, "items": to_dict_list(paginated["items"])}

@@ -13,6 +13,7 @@ from typing import Callable, Optional
 from app.services.compatibility import check_blood_compatibility, check_organ_compatibility
 from app.services.hla import calculate_hla_match
 from app.services.urgency import calculate_priority
+from app.services.quantum.search import classical_search, quantum_inspired_search
 
 # Score weighting — documented, not hidden. Blood/organ are hard gates (0 or
 # fail the candidate entirely); HLA and urgency combine into the ranking score.
@@ -93,4 +94,23 @@ def run_match(donors: list[dict], patient: dict, hospital_ready: bool = True,
             except Exception:
                 r["ai_summary"] = None  # AI layer failing never blocks the deterministic result
 
-    return {"patient_id": patient["id"], "candidates_evaluated": len(donors), "matches": top}
+    quantum_comparison = None
+    if results:
+        # Search-performance comparison only -- classical/quantum-inspired
+        # both search over the SAME already-scored pool, never re-scoring
+        # or re-ranking. Reported honestly per the module's own docstring:
+        # this is a classical amplitude-amplification-style heuristic, not
+        # real quantum hardware, and isn't guaranteed to find the true
+        # optimum the way the exhaustive scan above already has.
+        score_fn = lambda r: r["score"]
+        classical = classical_search(results, score_fn)
+        quantum = quantum_inspired_search(results, score_fn)
+        quantum_comparison = {
+            "candidates_searched": len(results),
+            "classical_evaluations": classical["evaluations"],
+            "quantum_inspired_evaluations": quantum["evaluations"],
+            "quantum_found_same_top_candidate": (quantum["best"] or {}).get("donor_id") == (top[0]["donor_id"] if top else None),
+            "note": "Comparison only -- the ranking above is the deterministic classical result and is authoritative regardless of what this shows.",
+        }
+
+    return {"patient_id": patient["id"], "candidates_evaluated": len(donors), "matches": top, "quantum_comparison": quantum_comparison}
