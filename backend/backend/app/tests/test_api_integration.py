@@ -204,3 +204,35 @@ def test_realtime_ws_rejects_invalid_token(client):
             assert False, "should have been rejected"
     except Exception:
         pass  # connection is closed by the server during handshake/first receive
+
+
+# ---------- expired token / invalid uploads (spec section 41) ----------
+
+def test_expired_jwt_rejected(client):
+    import jwt as pyjwt
+    from datetime import datetime, timedelta, timezone
+    from app.config import settings
+    expired_payload = {
+        "sub": "some-user-id", "email": "x@example.com", "role": "donor",
+        "exp": datetime.now(timezone.utc) - timedelta(minutes=5),
+    }
+    expired_token = pyjwt.encode(expired_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGO)
+    r = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
+    assert r.status_code == 401
+
+def test_upload_rejects_disallowed_file_type(client):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    r = client.post("/api/v1/documents?kind=certificate", headers=headers,
+                     files={"file": ("virus.exe", b"not a real document", "application/octet-stream")})
+    assert r.status_code == 400
+
+def test_upload_rejects_oversized_file(client):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    oversized = b"0" * (10 * 1024 * 1024 + 1)
+    r = client.post("/api/v1/documents?kind=certificate", headers=headers,
+                     files={"file": ("big.pdf", oversized, "application/pdf")})
+    assert r.status_code == 413
