@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models import Notification, User
 from app.services.mailer import send_email
+from app.services.realtime import publish_sync
 from app.config import settings
 
 
@@ -15,6 +16,8 @@ def notify(db: Session, recipient: User, title: str, message: str,
             send_email(recipient.email, title, message)
         except RuntimeError:
             pass
+    publish_sync("notification", {"id": n.id, "title": title, "message": message,
+                                   "priority": priority, "read": False}, user_id=recipient.id)
     return n
 
 
@@ -33,3 +36,4 @@ def notify_organizer(title: str, message: str) -> None:
         send_email(settings.ORGANIZER_EMAIL, title, message)
     except RuntimeError:
         pass
+    publish_sync("notification", {"title": title, "message": message, "priority": "normal"}, role="organizer")

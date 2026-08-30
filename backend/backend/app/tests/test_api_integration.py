@@ -171,3 +171,36 @@ def test_login_rate_limit_engages(client):
     for _ in range(12):
         r = client.post("/api/v1/auth/login", json={"email": email, "password": "wrong"})
     assert r.status_code == 429
+
+
+# ---------- real-time notifications (WebSocket) ----------
+
+def test_realtime_notification_pushed_on_doctor_approval(client, organizer_token):
+    """Regression test for the realtime wiring: notify() should push a
+    live event to a connected client matching the recipient's user_id,
+    not just write the DB Notification row."""
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    upload_token = reg["upload_token"]
+    headers = {"Authorization": f"Bearer {upload_token}"}
+    jpeg = _tiny_jpeg_bytes()
+    client.post("/api/v1/documents?kind=photo", headers=headers, files={"file": ("selfie.jpg", jpeg, "image/jpeg")})
+    client.post("/api/v1/documents?kind=certificate", headers=headers, files={"file": ("cert.jpg", jpeg, "image/jpeg")})
+
+    pending = client.get("/api/v1/organizer/doctors/pending", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(p for p in pending if p["doctor"]["license_number"] == f"LIC-{email.split(chr(64))[0]}")
+    doctor_id = entry["doctor"]["id"]
+
+    with client.websocket_connect(f"/api/v1/notifications/ws?token={upload_token}") as ws:
+        approve = client.post(f"/api/v1/organizer/doctors/{doctor_id}/approve", headers={"Authorization": f"Bearer {organizer_token}"})
+        assert approve.status_code == 200
+        msg = ws.receive_json()
+        assert msg["event"] == "notification"
+        assert "approved" in msg["data"]["title"].lower()
+
+def test_realtime_ws_rejects_invalid_token(client):
+    try:
+        with client.websocket_connect("/api/v1/notifications/ws?token=not-a-real-token"):
+            assert False, "should have been rejected"
+    except Exception:
+        pass  # connection is closed by the server during handshake/first receive

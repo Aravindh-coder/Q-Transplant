@@ -53,7 +53,16 @@ try:
     ensure_organizer_bootstrap()
 except Exception:
     logger.exception("ensure_organizer_bootstrap() failed at startup.")
-app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.2.0")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    import asyncio
+    from app.services import realtime
+    realtime.set_main_loop(asyncio.get_running_loop())
+    yield
+
+app=FastAPI(title="Q-Transplant API",description="Organ-transplant coordination, matching and emergency network platform.",version="2.2.0",lifespan=_lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=settings.ALLOWED_ORIGINS,allow_credentials=True,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["Authorization","Content-Type"],max_age=600)
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -84,6 +93,7 @@ async def _unhandled_exception_handler(request:Request,exc:Exception):
     return JSONResponse(status_code=500,content={"success":False,"error":{"code":"INTERNAL_ERROR","message":"Something went wrong on our end. Please try again."}})
 
 for router in (auth.router,users.router,donors.router,doctors.router,hospitals.router,patients.router,matching.router,organizer.router,devices.router,emergency.router,quantum_router.router,documents.router,donor_requests.router,notifications.router,hla.router,transplants.router,doctor_workflow.router,hospital_workflow.router): app.include_router(router)
+
 @app.get("/api")
 def api_status(): return {"service":"Q-Transplant API","status":"online","version":"2.2.0"}
 @app.get("/health")
