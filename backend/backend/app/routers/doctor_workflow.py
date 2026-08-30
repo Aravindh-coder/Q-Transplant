@@ -7,11 +7,11 @@ from app.database import get_db
 from app.models import User, DoctorProfile, Patient, TransplantCase, Document, MedicalDecision, Notification
 from app.security import require_role
 from app.services.audit import log_action
+from app.services import object_storage
 from app.utils import to_dict, to_dict_list
 from pathlib import Path
-import os, uuid
+import uuid
 router=APIRouter(prefix="/api/v1/doctor-workflow",tags=["doctor-workflow"])
-UPLOAD_ROOT=Path(os.getenv("UPLOAD_DIR","uploads")).resolve()
 class ProfileIn(BaseModel): phone:str; address:str; specialty:str; professional_information:str; hospital_id:Optional[str]=None
 class DecisionIn(BaseModel): patient_id:str; decision:str; notes:Optional[str]=None
 class PatientStatusIn(BaseModel): status:str
@@ -62,8 +62,9 @@ async def upload_doctor_document(kind:str=Form(...),file:UploadFile=File(...),us
  ext=Path(file.filename or "").suffix.lower()
  allowed_photo={".png",".jpg",".jpeg"}; allowed_doc=allowed_photo|{".pdf"}
  if ext not in (allowed_photo if kind=="profile_photo" else allowed_doc): raise HTTPException(400,"Invalid file type for this document")
- folder=UPLOAD_ROOT/user.id; folder.mkdir(parents=True,exist_ok=True); path=folder/f"{uuid.uuid4().hex}{ext}"; path.write_bytes(data)
- d=Document(owner_user_id=user.id,kind=kind,filename=file.filename or path.name,storage_path=str(path)); db.add(d); db.flush()
+ media_type={"png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","pdf":"application/pdf"}.get(ext.lstrip("."),"application/octet-stream")
+ storage_ref=object_storage.save(f"{user.id}/{uuid.uuid4().hex}{ext}",data,media_type)
+ d=Document(owner_user_id=user.id,kind=kind,filename=file.filename or storage_ref,storage_path=storage_ref); db.add(d); db.flush()
  p=db.query(DoctorProfile).filter(DoctorProfile.user_id==user.id).first()
  if kind=="profile_photo": p.photo_document_id=d.id
  if kind=="medical_certificate": p.certificate_document_id=d.id

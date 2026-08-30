@@ -31,12 +31,24 @@
   frontend (`public/`) is now served by this same FastAPI app, this is only
   needed if something else (an emergency device, a separate admin panel,
   local `npm run dev`, etc.) calls the API from a different origin.
+- `S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (optional, but
+  strongly recommended in production): enables durable document storage.
+  Works with any S3-compatible provider — AWS S3, Cloudflare R2, Backblaze
+  B2, etc. — set `S3_ENDPOINT_URL` too for anything that isn't AWS, and
+  `S3_REGION` if your provider requires a specific one. **Without these
+  set, uploaded documents are written to local disk and are lost on
+  Render's next deploy or restart** — the app still works, but every
+  doctor/hospital who registers before you set this will need to
+  re-upload their documents once you do.
 - Configure OTP/login rate limits and token expiry for deployment.
 
 ## Production requirements
 1. Run behind HTTPS and a reverse proxy/load balancer.
 2. Use PostgreSQL and a real migration tool (Alembic recommended) instead of runtime schema creation.
-3. Store uploads in private object storage or an encrypted private volume; serve through authorized backend download endpoints. **This matters immediately on Render specifically**: Render's filesystem is ephemeral, so every doctor photo/certificate and hospital license document uploaded to `uploads/` is wiped on the next deploy or restart. Until this moves to object storage (e.g. S3-compatible storage), assume uploaded documents don't survive a redeploy.
+3. Store uploads in private object storage — set `S3_BUCKET` and its
+   credentials above. Without it, Render's ephemeral filesystem wipes every
+   doctor photo/certificate and hospital license document on the next
+   deploy or restart.
 4. Run periodic encrypted database and document backups and test restoration regularly.
 5. Run API workers behind a process manager/container platform.
 6. Put long-running matching, email and backup work on a background worker/queue in production.

@@ -1,18 +1,18 @@
-import os
+import json
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Document, DoctorProfile, HospitalProfile
 from app.security import get_current_user
 from app.services.audit import log_action
 from app.services.identity_verification import verify_identity_photos
+from app.services import object_storage
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
-UPLOAD_ROOT = Path(os.getenv("UPLOAD_DIR", "uploads")).resolve()
 ALLOWED = {"pdf", "png", "jpg", "jpeg"}
 MAX_BYTES = 10 * 1024 * 1024
 _MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "pdf": "application/pdf"}
@@ -28,8 +28,8 @@ def _run_identity_check_if_ready(db: Session, profile: DoctorProfile):
     cert = db.query(Document).filter(Document.id == profile.certificate_document_id).first()
     if not photo or not cert:
         return
-    photo_ext = Path(photo.storage_path).suffix.lstrip(".")
-    cert_ext = Path(cert.storage_path).suffix.lstrip(".")
+    photo_ext = Path(photo.filename).suffix.lstrip(".").lower()
+    cert_ext = Path(cert.filename).suffix.lstrip(".").lower()
     if cert_ext == "pdf" or photo_ext == "pdf":
         # The comparison model takes images, not PDFs — skip automatically
         # and let the organizer compare visually instead.
@@ -37,10 +37,9 @@ def _run_identity_check_if_ready(db: Session, profile: DoctorProfile):
                   "reasoning": "The certificate was submitted as a PDF — automated photo comparison needs an image. An organizer must review it manually."}
     else:
         result = verify_identity_photos(
-            Path(photo.storage_path).read_bytes(), _MEDIA_TYPES[photo_ext],
-            Path(cert.storage_path).read_bytes(), _MEDIA_TYPES[cert_ext],
+            object_storage.read(photo.storage_path), _MEDIA_TYPES[photo_ext],
+            object_storage.read(cert.storage_path), _MEDIA_TYPES[cert_ext],
         )
-    import json
     profile.identity_check_result = json.dumps(result)
     profile.identity_check_confidence = result.get("confidence", "unknown")
     db.commit()
@@ -54,14 +53,11 @@ async def upload_document(kind: str, file: UploadFile = File(...), user: User = 
     data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "Document exceeds the 10 MB limit.")
-    owner_dir = UPLOAD_ROOT / user.id
-    owner_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = f"{uuid.uuid4().hex}.{ext}"
-    path = owner_dir / safe_name
-    path.write_bytes(data)
-    doc = Document(owner_user_id=user.id, kind=kind, filename=file.filename or safe_name, storage_path=str(path))
+    key = f"{user.id}/{uuid.uuid4().hex}.{ext}"
+    storage_ref = object_storage.save(key, data, _MEDIA_TYPES.get(ext, "application/octet-stream"))
+    doc = Document(owner_user_id=user.id, kind=kind, filename=file.filename or key, storage_path=storage_ref)
     db.add(doc); db.commit(); db.refresh(doc)
-    log_action(db, "DOCUMENT_UPLOADED", user_id=user.id, target=doc.id, meta={"kind": kind})
+    log_action(db, "DOCUMENT_UPLOADED", user_id=user.id, target=doc.id, meta={"kind": kind, "storage": "s3" if object_storage.is_configured() else "local"})
 
     # Auto-link to the owning profile so the organizer approval check
     # (which requires both IDs to be set) can ever actually be satisfied.
@@ -102,8 +98,10 @@ def document_file(document_id: str, user: User = Depends(get_current_user), db: 
         raise HTTPException(404, "Document not found.")
     if doc.owner_user_id != user.id and user.role != "organizer":
         raise HTTPException(403, "Not authorized to access this document.")
-    path = Path(doc.storage_path)
-    if not path.is_file():
+    url = object_storage.presigned_url(doc.storage_path)
+    if url:
+        return RedirectResponse(url)
+    if not object_storage.exists(doc.storage_path):
         raise HTTPException(404, "Stored file is missing.")
-    ext = path.suffix.lstrip(".")
-    return FileResponse(path, media_type=_MEDIA_TYPES.get(ext, "application/octet-stream"), filename=doc.filename)
+    ext = Path(doc.filename).suffix.lstrip(".").lower()
+    return FileResponse(doc.storage_path, media_type=_MEDIA_TYPES.get(ext, "application/octet-stream"), filename=doc.filename)
