@@ -295,3 +295,85 @@ def test_ai_match_summary_falls_back_without_api_key():
     from app.services.ai_assistant import summarize_match
     result = summarize_match({"rank": 1, "score": 92, "hla_score": 85, "urgency": "HIGH"})
     assert "92" in result or "score" in result.lower()
+
+
+# ---------- OTP edge cases (spec section 8/41) ----------
+from unittest.mock import patch
+
+def _register_donor(client, email):
+    r = client.post("/api/v1/auth/register", json={
+        "email": email, "password": "DonorPass123!", "role": "donor", "full_name": "Don Or",
+        "phone": "111", "address": "addr", "blood_group": "O+",
+    })
+    assert r.status_code == 200, r.text
+    return r
+
+def test_donor_email_verification_full_flow(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=123456):
+        _register_donor(client, email)
+    verify = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "123456"})
+    assert verify.status_code == 200
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    assert login.status_code == 200
+
+def test_wrong_otp_rejected(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=123456):
+        _register_donor(client, email)
+    verify = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "999999"})
+    assert verify.status_code == 400
+
+def test_otp_is_single_use(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=222222):
+        _register_donor(client, email)
+    first = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "222222"})
+    assert first.status_code == 200
+    second = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "222222"})
+    assert second.status_code == 400
+
+def test_expired_otp_rejected(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=333333):
+        _register_donor(client, email)
+    # Reach into the DB directly to simulate time passing -- there's no
+    # clock-injection seam in the app, so this is the honest way to test
+    # expiry without sleeping the test suite for real minutes.
+    from app.database import SessionLocal
+    from app.models import OTP
+    from datetime import datetime, timedelta, timezone
+    db = SessionLocal()
+    try:
+        row = db.query(OTP).filter(OTP.email == email, OTP.purpose == "email_verify").order_by(OTP.created_at.desc()).first()
+        row.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+    finally:
+        db.close()
+    verify = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "333333"})
+    assert verify.status_code == 400
+
+def test_password_reset_full_flow(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=444444):
+        _register_donor(client, email)
+    with patch("random.SystemRandom.randrange", return_value=555555):
+        forgot = client.post("/api/v1/auth/forgot-password", json={"email": email})
+    assert forgot.status_code == 200
+    reset = client.post("/api/v1/auth/reset-password", json={"email": email, "otp": "555555", "new_password": "NewPass456!"})
+    assert reset.status_code == 200
+    # old password no longer works, new one does (once email is verified)
+    with patch("random.SystemRandom.randrange", return_value=666666):
+        client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "444444"})
+    login_old = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    assert login_old.status_code == 401
+    login_new = client.post("/api/v1/auth/login", json={"email": email, "password": "NewPass456!"})
+    assert login_new.status_code == 200
+
+def test_forgot_password_does_not_leak_account_existence(client):
+    real_email = unique_email("donor")
+    _register_donor(client, real_email)
+    r1 = client.post("/api/v1/auth/forgot-password", json={"email": real_email})
+    r2 = client.post("/api/v1/auth/forgot-password", json={"email": unique_email("nosuchaccount")})
+    assert r1.status_code == r2.status_code == 200
+    assert r1.json() == r2.json()

@@ -1,25 +1,23 @@
-"""Full deterministic matching pipeline; AI is optional and cannot override gates."""
-from .blood import check_blood
-from .hla import check_hla
-from .organ import check_organ
-from .urgency import calculate_recipient_priority
-from .ranking import rank_candidate, rank_candidates
+"""Full deterministic matching pipeline -- delegates to the canonical,
+live implementation in app.services.matching_engine (used by the actual
+/api/v1/matching/run/{patient_id} endpoint) rather than maintaining a
+second, parallel copy of the same logic.
+
+This module (and its siblings blood.py/hla.py/organ.py/urgency.py/
+ranking.py in this package) used to be a fully separate implementation
+that nothing in the live app actually called -- only unit tests exercised
+it, so a bug fixed in the real pipeline could silently stay broken here
+and vice versa. That's genuinely risky for a medical matching system, so
+this now re-exports the real thing under the interface this package's
+tests already expect.
+"""
+from app.services.matching_engine import evaluate_candidate, run_match
+
 
 def evaluate(donor: dict, recipient: dict, hospital_ready: bool = True) -> dict | None:
-    blood = check_blood(donor, recipient)
-    if not blood["compatible"]:
-        return None
-    organ = check_organ(donor, recipient, hospital_ready)
-    if not organ["compatible"]:
-        return None
-    hla = check_hla(donor, recipient)
-    priority = calculate_recipient_priority(recipient, hospital_ready)
-    ranked = rank_candidate(hla.get("score", 0), priority.get("score", 0), priority.get("factors", []))
-    return {"donor_id": donor.get("id"), "blood_compatible": True, "blood_reason": blood["reason"], "organ_compatible": True, "hla_score": hla.get("score", 0), "hla_details": hla.get("details", {}), "urgency": recipient.get("urgency", "MEDIUM"), "priority_score": priority.get("score", 0), "priority_factors": priority.get("factors", []), **ranked}
+    return evaluate_candidate(donor, recipient, hospital_ready)
+
 
 def run_matching(donors: list[dict], recipient: dict, hospital_ready: bool = True, top_n: int = 5) -> dict:
-    matches = [r for d in donors if (r := evaluate(d, recipient, hospital_ready)) is not None]
-    matches = rank_candidates(matches)
-    for r in matches:
-        r["explanation"] = (r.get("explanation", "") + f" Deterministic gates passed: blood, organ, HLA evaluation, urgency and availability. Candidate rank: {r['rank']}.").strip()
-    return {"patient_id": recipient.get("id"), "candidates_evaluated": len(donors), "matches": matches[:max(1, top_n)]}
+    result = run_match(donors, recipient, hospital_ready, top_n=top_n)
+    return {"patient_id": result["patient_id"], "candidates_evaluated": result["candidates_evaluated"], "matches": result["matches"]}

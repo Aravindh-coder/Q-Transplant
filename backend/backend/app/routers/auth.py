@@ -12,6 +12,15 @@ from app.services.mailer import send_email
 from app.services.audit import log_action
 from app.services.observability import safe_event
 
+def _is_expired(expires_at: datetime) -> bool:
+    """DateTime columns round-trip as naive on SQLite (and depending on
+    driver, elsewhere too) even though everything is written as UTC-aware.
+    Comparing that directly against datetime.now(timezone.utc) raises
+    TypeError instead of just being wrong -- treat a naive value as UTC."""
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at < datetime.now(timezone.utc)
+
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 class RegisterIn(BaseModel):
     email: EmailStr; password: str = Field(min_length=8); role: str; full_name: str
@@ -75,7 +84,7 @@ def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
 def verify_email(body:VerifyEmailIn,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()
     row=db.query(OTP).filter(OTP.email==body.email,OTP.used==False,OTP.purpose=="email_verify").order_by(OTP.created_at.desc()).first()
-    if not user or not row or row.expires_at<datetime.now(timezone.utc) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired verification OTP.")
+    if not user or not row or _is_expired(row.expires_at) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired verification OTP.")
     row.used=True; user.email_verified=True
     if user.role=="donor": user.status="active"
     db.commit(); log_action(db,"EMAIL_VERIFIED",user_id=user.id); return {"message":"Email verified successfully.","status":user.status}
@@ -123,7 +132,7 @@ def forgot_password(body:ForgotPasswordIn,db:Session=Depends(get_db)):
 @router.post("/reset-password",dependencies=[Depends(rate_limit("password_reset_verify",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def reset_password(body:ResetPasswordIn,db:Session=Depends(get_db)):
     row=db.query(OTP).filter(OTP.email==body.email,OTP.used==False,OTP.purpose=="password_reset").order_by(OTP.created_at.desc()).first(); user=db.query(User).filter(User.email==body.email).first()
-    if not row or not user or row.expires_at<datetime.now(timezone.utc) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired OTP.")
+    if not row or not user or _is_expired(row.expires_at) or not verify_password(body.otp,row.code_hash): raise HTTPException(400,"Invalid or expired OTP.")
     user.hashed_password=hash_password(body.new_password); row.used=True
     db.query(OTP).filter(OTP.email==body.email,OTP.purpose=="password_reset",OTP.used==False).update({OTP.used:True},synchronize_session=False)
     db.commit(); log_action(db,"PASSWORD_RESET",user_id=user.id); return {"message":"Password updated successfully."}

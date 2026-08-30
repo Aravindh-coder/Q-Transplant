@@ -32,10 +32,11 @@ def evaluate_candidate(donor: dict, patient: dict, hospital_ready: bool = True) 
     if not blood["compatible"]:
         return None
 
-    donor_available = donor.get("availability_status", "active") == "active"
+    donor_available = str(donor.get("availability_status", "active")).lower() == "active"
     recipient_eligible = patient.get("eligible", True)
+    required_organ = str(patient["required_organ"]).lower()
     organ_available = next(
-        (o for o in donor.get("organs_available", []) if o.replace("_partial", "") == patient["required_organ"]),
+        (o for o in donor.get("organs_available", []) if str(o).lower().replace("_partial", "") == required_organ),
         None,
     )
     organ = check_organ_compatibility(
@@ -46,7 +47,7 @@ def evaluate_candidate(donor: dict, patient: dict, hospital_ready: bool = True) 
         return None
 
     hla = calculate_hla_match(donor, patient)
-    priority = calculate_priority(patient.get("urgency", "MEDIUM"), patient["waiting_since"], hospital_ready)
+    priority = calculate_priority(patient.get("urgency", "MEDIUM"), patient.get("waiting_since"), hospital_ready)
 
     # normalize urgency score (0-100 range roughly) for blending with HLA %
     urgency_normalized = min(100, priority["score"])

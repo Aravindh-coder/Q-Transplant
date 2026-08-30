@@ -51,3 +51,22 @@ def test_emergency_lifecycle():
 def test_invalid_emergency_transition_rejected():
     with pytest.raises(ValueError):
         transition("CREATED", "RESOLVED")
+
+
+# ---------- regression: matching/engine.py delegation surfaced two real bugs ----------
+
+def test_matching_handles_missing_waiting_since_key_entirely():
+    """A patient dict with no waiting_since key at all (not just None) used
+    to crash with KeyError deep inside urgency scoring."""
+    donor = {"id": 1, "blood_group": "O+", "organs_available": ["kidney"], "availability_status": "active"}
+    recipient = {"id": 9, "blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH", "eligible": True}
+    result = evaluate(donor, recipient)
+    assert result is not None
+    assert result["blood_compatible"] is True
+
+def test_matching_is_case_insensitive_on_availability_status():
+    """Donor records with 'ACTIVE' (uppercase) availability_status used to
+    silently fail every match instead of comparing case-insensitively."""
+    donor = {"id": 1, "blood_group": "O+", "organs_available": ["kidney"], "availability_status": "ACTIVE"}
+    recipient = {"id": 9, "blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH", "eligible": True}
+    assert evaluate(donor, recipient) is not None
