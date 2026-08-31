@@ -13,6 +13,7 @@ from app.services.notifications import notify_role, notify_organizer
 
 router = APIRouter(prefix="/api/v1/emergency", tags=["emergency"])
 CONNECTIONS: List[WebSocket] = []
+PUBLIC_CONNECTIONS: List[WebSocket] = []
 TERMINAL = {"RESOLVED", "CANCELLED"}
 
 
@@ -21,17 +22,19 @@ def now_iso(): return now_utc().isoformat()
 
 
 def _hospital_state(db):
+    names = {h.id: h.hospital_name for h in db.query(HospitalProfile).all()}
     out = {}
-    for h in db.query(HospitalProfile).all():
+    for hid, name in names.items():
         req = (db.query(EmergencyRequest)
-               .filter(EmergencyRequest.hospital_id == h.id,
+               .filter(EmergencyRequest.hospital_id == hid,
                        EmergencyRequest.status.notin_(list(TERMINAL)))
                .order_by(EmergencyRequest.created_at.desc()).first())
-        out[h.id] = {
-            "name": h.hospital_name,
+        out[hid] = {
+            "name": name,
             "status": "idle" if not req else ("donor_found" if req.responding_hospital_id else "emergency"),
             "requirement": req.requirement if req else "",
             "emergency_status": req.status if req else None,
+            "responding_hospital_name": names.get(req.responding_hospital_id) if req and req.responding_hospital_id else None,
         }
     return out
 
@@ -43,6 +46,15 @@ async def broadcast(payload):
         except Exception: dead.append(ws)
     for ws in dead:
         if ws in CONNECTIONS: CONNECTIONS.remove(ws)
+    # Public/observer connections (landing page) get the exact same
+    # payload -- _hospital_state() already only exposes hospital name,
+    # status, and the organ/requirement text, never patient or donor PII.
+    dead_public = []
+    for ws in list(PUBLIC_CONNECTIONS):
+        try: await ws.send_text(json.dumps(payload, default=str))
+        except Exception: dead_public.append(ws)
+    for ws in dead_public:
+        if ws in PUBLIC_CONNECTIONS: PUBLIC_CONNECTIONS.remove(ws)
 
 
 async def broadcast_state():
@@ -85,6 +97,31 @@ def list_emergencies(user: User = Depends(require_role("doctor", "hospital", "or
     return [{"id": x.id, "hospital_id": x.hospital_id, "requirement": x.requirement,
              "status": x.status, "created_at": x.created_at, "resolved_at": x.resolved_at}
             for x in q.limit(100).all()]
+
+
+@router.websocket("/public-ws")
+async def emergency_public_ws(websocket: WebSocket):
+    """Read-only live emergency status feed for the public landing page.
+    No auth, no ability to influence state -- purely an observer, unlike
+    the ESP32 channel above which requires a device token and can send
+    commands. Payload is the same _hospital_state() shape, which only
+    ever exposes hospital name / status / requirement text -- no patient
+    or donor identity ever appears here."""
+    await websocket.accept()
+    PUBLIC_CONNECTIONS.append(websocket)
+    db = SessionLocal()
+    try:
+        await websocket.send_text(json.dumps({"type": "state", "hospitals": _hospital_state(db), "timestamp": now_iso()}, default=str))
+    finally:
+        db.close()
+    try:
+        while True:
+            await websocket.receive_text()  # ignored -- observers can't send commands
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in PUBLIC_CONNECTIONS:
+            PUBLIC_CONNECTIONS.remove(websocket)
 
 
 @router.websocket("/ws")

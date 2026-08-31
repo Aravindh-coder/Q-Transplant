@@ -377,3 +377,43 @@ def test_forgot_password_does_not_leak_account_existence(client):
     r2 = client.post("/api/v1/auth/forgot-password", json={"email": unique_email("nosuchaccount")})
     assert r1.status_code == r2.status_code == 200
     assert r1.json() == r2.json()
+
+
+# ---------- public emergency status feed for the landing page ----------
+
+def test_public_emergency_ws_connects_and_receives_initial_state(client):
+    with client.websocket_connect("/api/v1/emergency/public-ws") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "state"
+        assert "hospitals" in msg
+
+def test_public_emergency_ws_sees_live_hospital_emergency(client, organizer_token):
+    # Register + verify a hospital so it appears in the public state feed.
+    email = unique_email("hospital")
+    reg = client.post("/api/v1/auth/register", json={
+        "email": email, "password": "HospPass123!", "role": "hospital", "full_name": "Contact",
+        "phone": "111", "address": "addr", "hospital_name": "PublicWS Test Hospital",
+        "hospital_code": f"CODE-{email.split(chr(64))[0]}", "location": "Downtown",
+        "registration_number": "REG-1", "authorized_contact": "Jane",
+    })
+    assert reg.status_code == 200
+    hospitals = client.get("/api/v1/hospitals", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    hospital = next(h for h in hospitals["items"] if h["hospital_name"] == "PublicWS Test Hospital")
+    verify = client.post(f"/api/v1/organizer/hospitals/{hospital['id']}/verify", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert verify.status_code == 200
+    with patch("random.SystemRandom.randrange", return_value=777777):
+        client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "777777"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "HospPass123!"})
+    assert login.status_code == 200
+    hosp_token = login.json()["access_token"]
+
+    with client.websocket_connect("/api/v1/emergency/public-ws") as ws:
+        ws.receive_json()  # initial state
+        create = client.post("/api/v1/emergency/create", json={"requirement": "O-negative kidney needed urgently"},
+                              headers={"Authorization": f"Bearer {hosp_token}"})
+        assert create.status_code == 200
+        update = ws.receive_json()
+        assert update["type"] == "state"
+        entry = update["hospitals"][hospital["id"]]
+        assert entry["status"] == "emergency"
+        assert entry["requirement"] == "O-negative kidney needed urgently"

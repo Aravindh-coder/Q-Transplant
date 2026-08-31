@@ -142,6 +142,18 @@ h2{font-family:var(--disp); font-size:clamp(1.8rem,3.6vw,2.8rem); font-weight:60
 .cta-banner p{color:#A0AEC0; max-width:600px; margin:0 auto 28px; font-size:1.05rem;}
 
 footer{border-top:1px solid var(--line); padding:40px 0; text-align:center; color:var(--muted); font-size:0.8rem; font-family:var(--mono);}
+
+/* Live ESP32/hospital emergency status feed */
+@keyframes emergencyPulse{0%,100%{box-shadow:inset 0 0 0 rgba(239,68,68,0)}50%{box-shadow:inset 0 0 180px rgba(239,68,68,0.55)}}
+body.emergency-active{animation:emergencyPulse 1.6s ease-in-out infinite;}
+@keyframes bannerSlide{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.25}}
+#liveEmergencyBanner{position:fixed; top:0; left:0; right:0; z-index:9999; padding:14px 20px; text-align:center; font-family:var(--disp); font-weight:700; letter-spacing:0.3px; display:none; align-items:center; justify-content:center; gap:10px; font-size:0.95rem;}
+#liveEmergencyBanner.show{display:flex; animation:bannerSlide .35s ease-out;}
+#liveEmergencyBanner.state-emergency{background:linear-gradient(90deg,var(--red),#b91c1c); color:#fff;}
+#liveEmergencyBanner.state-donor_found{background:linear-gradient(90deg,var(--cyan),#0d9488); color:#04231f;}
+#liveEmergencyBanner.state-resolved{background:linear-gradient(90deg,#22c55e,#15803d); color:#052e13;}
+#liveEmergencyBanner .dotpulse{width:9px; height:9px; border-radius:50%; background:currentColor; animation:dotBlink 1s infinite; flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -269,5 +281,64 @@ footer{border-top:1px solid var(--line); padding:40px 0; text-align:center; colo
   </div>
 </footer>
 
+<div id="liveEmergencyBanner"><span class="dotpulse"></span><span id="liveEmergencyText"></span></div>
+<script>
+(function(){
+  var banner=document.getElementById('liveEmergencyBanner');
+  var textEl=document.getElementById('liveEmergencyText');
+  var prevStates={};
+  var resolveTimer=null;
+
+  function setBanner(cls,text){
+    banner.className='show state-'+cls;
+    textEl.textContent=text;
+  }
+  function hideBanner(){
+    banner.className='';
+    document.body.classList.remove('emergency-active');
+  }
+
+  function applyState(hospitals){
+    var activeEmergency=null,activeDonorFound=null,justResolved=null;
+    for(var hid in hospitals){
+      var h=hospitals[hid];
+      var prev=prevStates[hid];
+      if(h.status==='emergency') activeEmergency=h;
+      else if(h.status==='donor_found') activeDonorFound=h;
+      else if(h.status==='idle'&&prev&&prev!=='idle') justResolved=h;
+      prevStates[hid]=h.status;
+    }
+    if(activeEmergency){
+      document.body.classList.add('emergency-active');
+      clearTimeout(resolveTimer);
+      setBanner('emergency','EMERGENCY — '+activeEmergency.name+' needs: '+(activeEmergency.requirement||'urgent assistance'));
+    }else if(activeDonorFound){
+      document.body.classList.remove('emergency-active');
+      clearTimeout(resolveTimer);
+      setBanner('donor_found','Donor found — '+(activeDonorFound.responding_hospital_name||'A hospital')+' is responding to '+activeDonorFound.name);
+    }else if(justResolved){
+      document.body.classList.remove('emergency-active');
+      setBanner('resolved','Donor acknowledged — case resolved');
+      clearTimeout(resolveTimer);
+      resolveTimer=setTimeout(hideBanner,5000);
+    }
+  }
+
+  function connect(){
+    var base=location.origin.replace(/^http/,'ws');
+    var ws;
+    try{ws=new WebSocket(base+'/api/v1/emergency/public-ws')}catch(e){setTimeout(connect,5000);return}
+    ws.onmessage=function(ev){
+      try{
+        var msg=JSON.parse(ev.data);
+        if(msg.type==='state') applyState(msg.hospitals||{});
+      }catch(e){}
+    };
+    ws.onclose=function(){setTimeout(connect,4000)};
+    ws.onerror=function(){try{ws.close()}catch(e){}};
+  }
+  connect();
+})();
+</script>
 </body>
 </html>
