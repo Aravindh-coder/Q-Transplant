@@ -546,3 +546,106 @@ def test_resume_registration_rejects_already_approved_doctor(client, organizer_t
     client.post(f"/api/v1/organizer/doctors/{entry['doctor']['id']}/approve", headers={"Authorization": f"Bearer {organizer_token}"})
     resume = client.post("/api/v1/auth/resume-registration", json={"email": email, "password": "DoctorPass123!"})
     assert resume.status_code == 400
+
+
+# ---------- registration resume (fixes the 'server waking up then already exists' trap) ----------
+
+def test_doctor_registration_resumes_on_retry_with_same_credentials(client):
+    email = unique_email("doctor")
+    payload = {
+        "email": email, "password": "DoctorPass123!", "role": "doctor", "full_name": "Dr Retry",
+        "phone": "111", "address": "addr", "license_number": f"LIC-{email.split(chr(64))[0]}",
+        "specialty": "Cardio", "professional_information": "info",
+    }
+    first = client.post("/api/v1/auth/register", json=payload)
+    assert first.status_code == 200
+    # Simulate exactly the reported scenario: the client gave up waiting
+    # but the request had already succeeded server-side, so it retries
+    # with the identical payload.
+    second = client.post("/api/v1/auth/register", json=payload)
+    assert second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+    assert "upload_token" in second.json()
+    # No duplicate doctor profile should have been created.
+    from app.database import SessionLocal
+    from app.models import DoctorProfile
+    db = SessionLocal()
+    try:
+        count = db.query(DoctorProfile).filter_by(license_number=payload["license_number"]).count()
+        assert count == 1
+    finally:
+        db.close()
+
+def test_registration_retry_with_wrong_password_still_blocked(client):
+    email = unique_email("doctor")
+    payload = {
+        "email": email, "password": "DoctorPass123!", "role": "doctor", "full_name": "Dr X",
+        "phone": "111", "address": "addr", "license_number": f"LIC-{email.split(chr(64))[0]}",
+        "specialty": "Cardio", "professional_information": "info",
+    }
+    client.post("/api/v1/auth/register", json=payload)
+    bad = dict(payload); bad["password"] = "SomeoneElsePassword!"
+    r = client.post("/api/v1/auth/register", json=bad)
+    assert r.status_code == 409
+
+def test_registration_retry_blocked_once_already_approved(client, organizer_token):
+    email = unique_email("doctor")
+    payload = {
+        "email": email, "password": "DoctorPass123!", "role": "doctor", "full_name": "Dr Approved",
+        "phone": "111", "address": "addr", "license_number": f"LIC-{email.split(chr(64))[0]}",
+        "specialty": "Cardio", "professional_information": "info",
+    }
+    reg = client.post("/api/v1/auth/register", json=payload)
+    headers = {"Authorization": f"Bearer {reg.json()['upload_token']}"}
+    jpeg = _tiny_jpeg_bytes()
+    client.post("/api/v1/documents?kind=photo", headers=headers, files={"file": ("s.jpg", jpeg, "image/jpeg")})
+    client.post("/api/v1/documents?kind=certificate", headers=headers, files={"file": ("c.jpg", jpeg, "image/jpeg")})
+    pending = client.get("/api/v1/organizer/doctors/pending", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(p for p in pending if p["doctor"]["license_number"] == payload["license_number"])
+    client.post(f"/api/v1/organizer/doctors/{entry['doctor']['id']}/approve", headers={"Authorization": f"Bearer {organizer_token}"})
+    # Once approved, a retry of the original registration must NOT resume --
+    # it should hard-block like a genuine duplicate.
+    retry = client.post("/api/v1/auth/register", json=payload)
+    assert retry.status_code == 409
+
+def test_donor_registration_resume_resends_otp(client):
+    email = unique_email("donor")
+    payload = {
+        "email": email, "password": "DonorPass123!", "role": "donor", "full_name": "Don Retry",
+        "phone": "1", "address": "a", "blood_group": "O+",
+    }
+    with patch("random.SystemRandom.randrange", return_value=444555):
+        client.post("/api/v1/auth/register", json=payload)
+    with patch("random.SystemRandom.randrange", return_value=666777):
+        resumed = client.post("/api/v1/auth/register", json=payload)
+    assert resumed.status_code == 200
+    # The first code should no longer work (invalidated by the resend);
+    # the fresh one should.
+    stale = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "444555"})
+    assert stale.status_code == 400
+    fresh = client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "666777"})
+    assert fresh.status_code == 200
+
+
+# ---------- mailer resilience: a real SMTP failure must never crash the triggering request ----------
+
+def test_registration_survives_smtp_failure(client, monkeypatch):
+    """Registration writes the account to the DB before attempting to send
+    a confirmation email. If the SMTP send itself fails for any reason
+    (network, auth, DNS -- anything other than 'not configured'), that
+    must degrade gracefully, not turn a successful registration into a
+    500 for the user."""
+    import smtplib
+    def broken_smtp(*a, **kw):
+        raise OSError("simulated network failure")
+    monkeypatch.setattr(smtplib, "SMTP", broken_smtp)
+    from app.config import settings
+    monkeypatch.setattr(settings, "ORGANIZER_APP_PASSWORD", "fake-app-password-for-this-test")
+    email = unique_email("doctor")
+    r = client.post("/api/v1/auth/register", json={
+        "email": email, "password": "DoctorPass123!", "role": "doctor", "full_name": "Dr Mailfail",
+        "phone": "111", "address": "addr", "license_number": f"LIC-{email.split(chr(64))[0]}",
+        "specialty": "Cardio", "professional_information": "info",
+    })
+    assert r.status_code == 200
+    assert "upload_token" in r.json()

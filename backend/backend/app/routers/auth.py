@@ -50,26 +50,50 @@ def _send_verification(user, db):
 def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
     if body.role=="organizer": raise HTTPException(400,"Organizer accounts can't self-register. The first organizer login is created automatically from the ORGANIZER_BOOTSTRAP_EMAIL / ORGANIZER_BOOTSTRAP_PASSWORD environment variables on startup.")
     if body.role not in ("donor","doctor","hospital"): raise HTTPException(400,"role must be donor, doctor, or hospital")
-    if db.query(User).filter(User.email==body.email).first(): raise HTTPException(409,"An account with this email already exists.")
+    existing=db.query(User).filter(User.email==body.email).first()
+    if existing:
+        # A request can succeed on the server even after the client gives up
+        # waiting (a cold Render instance is exactly this scenario) -- if
+        # this is genuinely the same person retrying a registration that
+        # never got resolved, resume it instead of dead-ending them on a
+        # confusing 'already exists' error. Only resumes when the role
+        # matches, nothing has been approved/rejected/verified yet, and the
+        # password matches (otherwise this is someone else's account and
+        # the normal block below is exactly right).
+        still_pending = existing.status in ("pending","unverified")
+        if existing.role==body.role and still_pending and verify_password(body.password,existing.hashed_password):
+            user=existing
+            safe_event("register_resumed",user_id=user.id,role=user.role)
+        else:
+            raise HTTPException(409,"An account with this email already exists.")
+    else:
+        user=None
     if not body.full_name.strip(): raise HTTPException(400,"full_name is required")
     if body.role=="donor" and (not body.blood_group or not body.phone or not body.address): raise HTTPException(400,"Donor registration requires blood_group, phone and address.")
     if body.role=="doctor" and (not body.phone or not body.address or not body.license_number or not body.specialty or not body.professional_information): raise HTTPException(400,"Doctor registration requires phone, address, license_number, specialty and professional_information. Profile photo and medical certificate must be uploaded before approval.")
     if body.role=="hospital" and (not body.hospital_name or not body.hospital_code or not body.phone or not body.address or not body.location or not body.registration_number or not body.authorized_contact): raise HTTPException(400,"Hospital registration requires all institutional fields.")
-    status="unverified" if body.role=="donor" else "pending"
-    user=User(email=body.email,hashed_password=hash_password(body.password),role=body.role,full_name=body.full_name.strip(),status=status,email_verified=False)
-    db.add(user); db.commit(); db.refresh(user)
-    if body.role=="doctor": db.add(DoctorProfile(user_id=user.id,license_number=body.license_number,phone=body.phone,address=body.address,specialty=body.specialty,professional_information=body.professional_information,hospital_id=body.hospital_id,approval_status="PENDING_APPROVAL"))
-    elif body.role=="hospital": db.add(HospitalProfile(user_id=user.id,hospital_name=body.hospital_name,hospital_code=body.hospital_code,phone=body.phone,address=body.address,location=body.location,registration_number=body.registration_number,authorized_contact=body.authorized_contact,verification_status="pending"))
-    else: db.add(DonorProfile(user_id=user.id,blood_group=body.blood_group.upper(),phone=body.phone,address=body.address,donation_status="ACTIVE"))
-    db.commit(); log_action(db,"REGISTER",user_id=user.id,target=body.role.upper(),ip_address=request.client.host if request.client else None)
-    try:
-        if body.role=="donor": _send_verification(user,db)
-        elif body.role=="doctor":
-            send_email(body.email,"Q-Transplant — registration received","Your doctor registration was received and is pending organizer review. Complete the mandatory profile photo and medical certificate upload before approval.")
-            if settings.ORGANIZER_EMAIL: send_email(settings.ORGANIZER_EMAIL,"Q-Transplant — new doctor pending approval",f"{body.full_name} registered as a doctor. License: {body.license_number}. Review the submitted registration.")
-        elif body.role=="hospital" and settings.ORGANIZER_EMAIL: send_email(body.email,"Q-Transplant — registration received","Your hospital registration was received and is pending verification.")
-    except RuntimeError:
-        pass
+    if user is None:
+        status="unverified" if body.role=="donor" else "pending"
+        user=User(email=body.email,hashed_password=hash_password(body.password),role=body.role,full_name=body.full_name.strip(),status=status,email_verified=False)
+        db.add(user); db.commit(); db.refresh(user)
+        if body.role=="doctor": db.add(DoctorProfile(user_id=user.id,license_number=body.license_number,phone=body.phone,address=body.address,specialty=body.specialty,professional_information=body.professional_information,hospital_id=body.hospital_id,approval_status="PENDING_APPROVAL"))
+        elif body.role=="hospital": db.add(HospitalProfile(user_id=user.id,hospital_name=body.hospital_name,hospital_code=body.hospital_code,phone=body.phone,address=body.address,location=body.location,registration_number=body.registration_number,authorized_contact=body.authorized_contact,verification_status="pending"))
+        else: db.add(DonorProfile(user_id=user.id,blood_group=body.blood_group.upper(),phone=body.phone,address=body.address,donation_status="ACTIVE"))
+        db.commit(); log_action(db,"REGISTER",user_id=user.id,target=body.role.upper(),ip_address=request.client.host if request.client else None)
+        try:
+            if body.role=="donor": _send_verification(user,db)
+            elif body.role=="doctor":
+                send_email(body.email,"Q-Transplant — registration received","Your doctor registration was received and is pending organizer review. Complete the mandatory profile photo and medical certificate upload before approval.")
+                if settings.ORGANIZER_EMAIL: send_email(settings.ORGANIZER_EMAIL,"Q-Transplant — new doctor pending approval",f"{body.full_name} registered as a doctor. License: {body.license_number}. Review the submitted registration.")
+            elif body.role=="hospital" and settings.ORGANIZER_EMAIL: send_email(body.email,"Q-Transplant — registration received","Your hospital registration was received and is pending verification.")
+        except RuntimeError:
+            pass
+    elif body.role=="donor":
+        # Resuming a still-unverified donor registration -- the original
+        # OTP may have expired by now, so send a fresh one rather than
+        # leaving them stuck with no way to actually verify.
+        try: _send_verification(user,db)
+        except RuntimeError: pass
     response={"id":user.id,"status":user.status,"email_verification_required":body.role=="donor","approval_required":body.role in ("doctor","hospital")}
     if body.role in ("doctor","hospital"):
         # Normal /login is blocked until organizer approval, but the doctor
