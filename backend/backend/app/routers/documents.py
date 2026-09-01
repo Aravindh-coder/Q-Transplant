@@ -10,6 +10,7 @@ from app.security import get_current_user
 from app.services.audit import log_action
 from app.services.identity_verification import verify_identity_photos
 from app.services import object_storage
+from app.services.notifications import notify_organizer
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
@@ -43,6 +44,21 @@ def _run_identity_check_if_ready(db: Session, profile: DoctorProfile):
     profile.identity_check_result = json.dumps(result)
     profile.identity_check_confidence = result.get("confidence", "unknown")
     db.commit()
+
+    doctor_user = db.query(User).filter(User.id == profile.user_id).first()
+    name = doctor_user.full_name if doctor_user else "A doctor"
+    if result.get("status") == "completed":
+        if result.get("same_person_likely") is True:
+            verdict = f"AI check: the live photo and certificate photo APPEAR TO BE THE SAME PERSON (confidence: {result.get('confidence')})."
+        elif result.get("same_person_likely") is False:
+            verdict = f"AI check: the live photo and certificate photo DO NOT APPEAR TO MATCH (confidence: {result.get('confidence')}) — please review closely, this may indicate a fraudulent submission."
+        else:
+            verdict = "AI check: could not clearly determine a match from the submitted photos — manual review needed."
+        detail = f"{verdict} Reasoning: {result.get('reasoning', '')}"
+    else:
+        detail = f"AI identity check did not run ({result.get('reasoning', result.get('status'))}) — please compare the two submitted photos manually."
+    notify_organizer("Q-Transplant — doctor documents ready for review",
+                      f"{name}'s license and live photo are both uploaded and ready for approval. {detail}")
 
 
 @router.post("")

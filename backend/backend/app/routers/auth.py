@@ -80,6 +80,39 @@ def register(body:RegisterIn,request:Request,db:Session=Depends(get_db)):
         response["upload_token"]=create_access_token(user,minutes=30)
     return response
 
+class ResumeRegistrationIn(BaseModel): email: EmailStr; password: str
+
+@router.post("/resume-registration",dependencies=[Depends(rate_limit("resume_registration",settings.LOGIN_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
+def resume_registration(body:ResumeRegistrationIn,db:Session=Depends(get_db)):
+    """If a registration request succeeded on the server but the client
+    never got the response (very plausible on a slow cold start), the
+    email now shows as 'already exists' with no way back in — the person
+    never received their OTP/upload_token and can't re-register with the
+    same email. This picks that account back up: same email+password
+    proves it's genuinely them, and if the account hasn't been
+    approved/verified/rejected yet, this re-issues exactly what the
+    original registration response would have given them, so they can
+    continue right where they left off instead of being stuck."""
+    user=db.query(User).filter(User.email==body.email).first()
+    if not user or not verify_password(body.password,user.hashed_password):
+        raise HTTPException(401,"Incorrect email or password.")
+    if user.role=="organizer": raise HTTPException(400,"Organizer accounts don't go through this flow.")
+    if user.email_verified and user.role=="donor": raise HTTPException(400,"This account is already verified — log in normally.")
+    if user.role=="doctor":
+        d=db.query(DoctorProfile).filter(DoctorProfile.user_id==user.id).first()
+        if d and d.approval_status=="APPROVED": raise HTTPException(400,"This doctor account is already approved — log in normally.")
+        if d and d.approval_status=="REJECTED": raise HTTPException(400,"This registration was rejected. Contact the organizer, or register again with different details.")
+    if user.role=="hospital":
+        h=db.query(HospitalProfile).filter(HospitalProfile.user_id==user.id).first()
+        if h and h.verification_status=="verified": raise HTTPException(400,"This hospital account is already verified — log in normally.")
+    log_action(db,"REGISTRATION_RESUMED",user_id=user.id,target=user.role.upper())
+    if user.role=="donor":
+        try: _send_verification(user,db)
+        except RuntimeError: pass
+        return {"id":user.id,"status":user.status,"email_verification_required":True,"message":"A new verification code has been sent to your email."}
+    return {"id":user.id,"status":user.status,"approval_required":True,"upload_token":create_access_token(user,minutes=30),
+            "message":"Continue by uploading your documents — your original registration was already received."}
+
 @router.post("/verify-email",dependencies=[Depends(rate_limit("otp_verify",settings.OTP_RATE_LIMIT,settings.RATE_LIMIT_WINDOW_MINUTES))])
 def verify_email(body:VerifyEmailIn,db:Session=Depends(get_db)):
     user=db.query(User).filter(User.email==body.email).first()

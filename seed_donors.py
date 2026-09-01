@@ -94,6 +94,9 @@ def seed_database():
             hospital_code="HOSP-CHN-001",
             phone="+91 44 2829 0200",
             address="Greams Road, Chennai, Tamil Nadu",
+            location="Chennai, Tamil Nadu",
+            registration_number="TN-HOSP-2024-0001",
+            authorized_contact="Dr. Ramesh Iyer, Chief Administrator",
             verification_status="verified"
         )
         db.add(hosp_profile)
@@ -120,14 +123,19 @@ def seed_database():
             license_number="MCI-2024-88992",
             specialty="Transplant Surgery",
             hospital_id=hosp_profile.id if hosp_profile else "h1",
-            approval_status="approved",
-            phone="+91 98765 43210"
+            approval_status="APPROVED",
+            phone="+91 98765 43210",
+            address="Greams Road, Chennai, Tamil Nadu",
+            professional_information="15 years in solid-organ transplant surgery; fellowship-trained, MCI-registered."
         )
         db.add(doc_profile)
         db.commit()
 
+    doc_profile = db.query(DoctorProfile).filter_by(user_id=doc_user.id).first()
+
     print("Generating 1,000 medical donor records...")
     random.seed(42)
+    donor_password_hash = hash_password("DonorDefault123!")  # hashed once -- bcrypt is deliberately slow
 
     current_count = db.query(DonorProfile).count()
     target_total = 1000
@@ -140,7 +148,7 @@ def seed_database():
         
         u = User(
             email=email,
-            hashed_password=hash_password("DonorDefault123!"),
+            hashed_password=donor_password_hash,
             role="donor",
             full_name=name,
             status="active",
@@ -182,6 +190,30 @@ def seed_database():
     db.commit()
     total = db.query(DonorProfile).count()
     print(f"Successfully seeded database with {total} donors!")
+
+    print("Seeding demo patients (one per organ, for immediate matching demos)...")
+    demo_patients = [
+        {"full_name": "Kavya Subramaniam", "age": 41, "gender": "Female", "blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH"},
+        {"full_name": "Ibrahim Sheikh", "age": 55, "gender": "Male", "blood_group": "A+", "required_organ": "liver", "urgency": "CRITICAL"},
+        {"full_name": "Rekha Nair", "age": 33, "gender": "Female", "blood_group": "B+", "required_organ": "heart", "urgency": "EMERGENCY"},
+        {"full_name": "Sameer Khan", "age": 47, "gender": "Male", "blood_group": "AB+", "required_organ": "lung", "urgency": "HIGH"},
+        {"full_name": "Devika Menon", "age": 29, "gender": "Female", "blood_group": "O-", "required_organ": "pancreas", "urgency": "MEDIUM"},
+        {"full_name": "Arvind Chowdhury", "age": 38, "gender": "Male", "blood_group": "A-", "required_organ": "intestine", "urgency": "MEDIUM"},
+    ]
+    for p in demo_patients:
+        exists = db.query(Patient).filter_by(full_name=p["full_name"], hospital_id=hosp_profile.id).first()
+        if exists:
+            continue
+        db.add(Patient(
+            hospital_id=hosp_profile.id if hosp_profile else "h1",
+            doctor_id=doc_profile.id,
+            full_name=p["full_name"], age=p["age"], gender=p["gender"],
+            blood_group=p["blood_group"], required_organ=p["required_organ"], urgency=p["urgency"],
+            hla_a=random.choice(HLA_A_ALLELES), hla_b=random.choice(HLA_B_ALLELES),
+            hla_c=random.choice(HLA_C_ALLELES), hla_dr=random.choice(HLA_DR_ALLELES), hla_dq=random.choice(HLA_DQ_ALLELES),
+        ))
+    db.commit()
+    print(f"Seeded {len(demo_patients)} demo patients -- log in as dr.aravindh@qtransplant.org / DoctorPass123! and run a match on any of them.")
     db.close()
 
 if __name__ == "__main__":

@@ -417,3 +417,132 @@ def test_public_emergency_ws_sees_live_hospital_emergency(client, organizer_toke
         entry = update["hospitals"][hospital["id"]]
         assert entry["status"] == "emergency"
         assert entry["requirement"] == "O-negative kidney needed urgently"
+
+
+# ---------- ad-hoc recipient search with quantum trace + AI review ----------
+
+def test_ad_hoc_recipient_search(client, organizer_token):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    jpeg = _tiny_jpeg_bytes()
+    client.post("/api/v1/documents?kind=photo", headers=headers, files={"file": ("s.jpg", jpeg, "image/jpeg")})
+    client.post("/api/v1/documents?kind=certificate", headers=headers, files={"file": ("c.jpg", jpeg, "image/jpeg")})
+    pending = client.get("/api/v1/organizer/doctors/pending", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(p for p in pending if p["doctor"]["license_number"] == f"LIC-{email.split(chr(64))[0]}")
+    client.post(f"/api/v1/organizer/doctors/{entry['doctor']['id']}/approve", headers={"Authorization": f"Bearer {organizer_token}"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DoctorPass123!"})
+    doc_token = login.json()["access_token"]
+
+    r = client.post("/api/v1/matching/search",
+                     json={"blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH", "ai_review_top_n": 1},
+                     headers={"Authorization": f"Bearer {doc_token}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "recipient_criteria" in body
+    assert "matches" in body
+    assert "quantum_comparison" in body
+    assert "search_trace" in body
+
+def test_ad_hoc_search_blocked_for_donor_role(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=111888):
+        client.post("/api/v1/auth/register", json={
+            "email": email, "password": "DonorPass123!", "role": "donor", "full_name": "D",
+            "phone": "1", "address": "a", "blood_group": "O+",
+        })
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "111888"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    assert login.status_code == 200
+    donor_token = login.json()["access_token"]
+    r = client.post("/api/v1/matching/search", json={"blood_group": "O+", "required_organ": "kidney"},
+                     headers={"Authorization": f"Bearer {donor_token}"})
+    assert r.status_code == 403
+
+
+# ---------- donor CSV bulk import (not available to the donor role) ----------
+
+def test_donor_csv_import(client, organizer_token):
+    csv_content = (
+        "full_name,email,blood_group,organs_available,phone,address\n"
+        f"Test Donor One,{unique_email('csvdonor')},O+,kidney;liver,111,addr\n"
+        f"Test Donor Two,{unique_email('csvdonor')},invalid-blood-group,kidney,111,addr\n"
+        f"Test Donor Three,{unique_email('csvdonor')},AB-,heart,111,addr\n"
+    )
+    r = client.post("/api/v1/donors/import",
+                     files={"file": ("donors.csv", csv_content.encode(), "text/csv")},
+                     headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["created"] == 2
+    assert body["skipped_count"] == 1
+    assert "invalid" in body["skipped"][0]["reason"]
+
+def test_donor_csv_import_rejects_non_csv_role_and_filetype(client, organizer_token):
+    r = client.post("/api/v1/donors/import",
+                     files={"file": ("donors.txt", b"not a csv", "text/plain")},
+                     headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 400
+
+def test_donor_csv_import_blocked_for_donor_role(client):
+    email = unique_email("donor")
+    with patch("random.SystemRandom.randrange", return_value=222999):
+        client.post("/api/v1/auth/register", json={
+            "email": email, "password": "DonorPass123!", "role": "donor", "full_name": "D",
+            "phone": "1", "address": "a", "blood_group": "O+",
+        })
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "222999"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    donor_token = login.json()["access_token"]
+    r = client.post("/api/v1/donors/import",
+                     files={"file": ("donors.csv", b"blood_group\nO+\n", "text/csv")},
+                     headers={"Authorization": f"Bearer {donor_token}"})
+    assert r.status_code == 403
+
+
+# ---------- registration resume (server succeeded, client never got the response) ----------
+
+def test_resume_registration_for_doctor_reissues_upload_token(client):
+    """Simulates the exact bug reported: registration succeeded server-side,
+    but the client never got the response, so retrying just sees 'account
+    already exists' with no way to continue."""
+    email = unique_email("doctor")
+    _register_doctor(client, email)  # this is the request whose response "got lost"
+    resume = client.post("/api/v1/auth/resume-registration", json={"email": email, "password": "DoctorPass123!"})
+    assert resume.status_code == 200
+    body = resume.json()
+    assert "upload_token" in body
+    # the reissued token actually works for document upload
+    jpeg = _tiny_jpeg_bytes()
+    r = client.post("/api/v1/documents?kind=photo", headers={"Authorization": f"Bearer {body['upload_token']}"},
+                     files={"file": ("s.jpg", jpeg, "image/jpeg")})
+    assert r.status_code == 200
+
+def test_resume_registration_for_donor_resends_otp(client):
+    email = unique_email("donor")
+    client.post("/api/v1/auth/register", json={
+        "email": email, "password": "DonorPass123!", "role": "donor", "full_name": "D",
+        "phone": "1", "address": "a", "blood_group": "O+",
+    })
+    resume = client.post("/api/v1/auth/resume-registration", json={"email": email, "password": "DonorPass123!"})
+    assert resume.status_code == 200
+    assert resume.json()["email_verification_required"] is True
+
+def test_resume_registration_rejects_wrong_password(client):
+    email = unique_email("doctor")
+    _register_doctor(client, email)
+    resume = client.post("/api/v1/auth/resume-registration", json={"email": email, "password": "WrongPassword!"})
+    assert resume.status_code == 401
+
+def test_resume_registration_rejects_already_approved_doctor(client, organizer_token):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    jpeg = _tiny_jpeg_bytes()
+    client.post("/api/v1/documents?kind=photo", headers=headers, files={"file": ("s.jpg", jpeg, "image/jpeg")})
+    client.post("/api/v1/documents?kind=certificate", headers=headers, files={"file": ("c.jpg", jpeg, "image/jpeg")})
+    pending = client.get("/api/v1/organizer/doctors/pending", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(p for p in pending if p["doctor"]["license_number"] == f"LIC-{email.split(chr(64))[0]}")
+    client.post(f"/api/v1/organizer/doctors/{entry['doctor']['id']}/approve", headers={"Authorization": f"Bearer {organizer_token}"})
+    resume = client.post("/api/v1/auth/resume-registration", json={"email": email, "password": "DoctorPass123!"})
+    assert resume.status_code == 400

@@ -68,3 +68,51 @@ def quantum_inspired_search(candidates: list[dict], score_fn: Callable[[dict], f
             weights[i] *= 1.0 + max(0.0, s - best_score + 1.0) / (best_score + 1e-6 if best_score > 0 else 1.0)
 
     return {"best": best, "best_score": best_score, "evaluations": evaluations}
+
+
+def quantum_inspired_search_traced(candidates: list[dict], score_fn: Callable[[dict], float],
+                                    id_fn: Callable[[dict], str], iterations: int | None = None,
+                                    seed: int | None = None) -> dict:
+    """Same algorithm as quantum_inspired_search, but records a step-by-step
+    trace of each round (which candidates were sampled, the running best,
+    the amplitude weight distribution) so a frontend can animate the actual
+    search happening instead of only showing a final number. Used by the
+    live search demo endpoint; the honest pipeline-comparison metadata on
+    every real match still uses the untraced version above to avoid the
+    extra memory/serialization cost on every request."""
+    rng = random.Random(seed)
+    n = len(candidates)
+    if n == 0:
+        return {"best": None, "best_score": -math.inf, "evaluations": 0, "trace": []}
+
+    iterations = iterations or max(3, round(math.sqrt(n)))
+    weights = [1.0] * n
+    evaluations = 0
+    best, best_score, best_id = None, -math.inf, None
+    sample_size = max(1, round(n / iterations))
+    trace = []
+
+    for it in range(iterations):
+        total = sum(weights)
+        probs = [w / total for w in weights]
+        sample_idx = rng.choices(range(n), weights=probs, k=min(sample_size, n))
+        sampled_ids = []
+        for i in set(sample_idx):
+            s = score_fn(candidates[i])
+            evaluations += 1
+            sampled_ids.append(id_fn(candidates[i]))
+            if s > best_score:
+                best, best_score, best_id = candidates[i], s, id_fn(candidates[i])
+            weights[i] *= 1.0 + max(0.0, s - best_score + 1.0) / (best_score + 1e-6 if best_score > 0 else 1.0)
+        top_weighted = sorted(range(n), key=lambda i: weights[i], reverse=True)[:5]
+        max_w = max(weights) or 1.0
+        trace.append({
+            "iteration": it + 1,
+            "sampled_candidate_ids": sampled_ids,
+            "evaluations_so_far": evaluations,
+            "best_so_far_id": best_id,
+            "best_so_far_score": None if best_score == -math.inf else round(best_score, 2),
+            "top_amplitudes": [{"id": id_fn(candidates[i]), "weight": round(weights[i] / max_w, 3)} for i in top_weighted],
+        })
+
+    return {"best": best, "best_score": best_score, "evaluations": evaluations, "trace": trace, "iterations": iterations, "candidates_searched": n}
