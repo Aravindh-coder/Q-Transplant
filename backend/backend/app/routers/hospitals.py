@@ -27,7 +27,7 @@ def upsert_my_profile(body: HospitalProfileIn, user: User = Depends(require_role
     if not profile:
         profile = HospitalProfile(user_id=user.id, hospital_name=body.hospital_name, hospital_code=body.hospital_code)
         db.add(profile)
-    for field, value in body.dict(exclude_unset=True).items():
+    for field, value in body.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)
     db.commit()
     db.refresh(profile)

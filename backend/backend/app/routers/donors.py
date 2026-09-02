@@ -46,7 +46,7 @@ def upsert_my_profile(body: DonorProfileIn, user: User = Depends(require_role("d
     if not profile:
         profile = DonorProfile(user_id=user.id, blood_group=body.blood_group.upper(), donation_status="ACTIVE")
         db.add(profile)
-    data = body.dict(exclude_unset=True)
+    data = body.model_dump(exclude_unset=True)
     data["blood_group"] = body.blood_group.upper()
     for field, value in data.items():
         setattr(profile, field, value)

@@ -649,3 +649,104 @@ def test_registration_survives_smtp_failure(client, monkeypatch):
     })
     assert r.status_code == 200
     assert "upload_token" in r.json()
+
+
+# ---------- transplant case lifecycle (spec section 36 -- was a stub health-check only) ----------
+
+def _approved_doctor(client, organizer_token):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    jpeg = _tiny_jpeg_bytes()
+    client.post("/api/v1/documents?kind=photo", headers=headers, files={"file": ("s.jpg", jpeg, "image/jpeg")})
+    client.post("/api/v1/documents?kind=certificate", headers=headers, files={"file": ("c.jpg", jpeg, "image/jpeg")})
+    pending = client.get("/api/v1/organizer/doctors/pending", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(p for p in pending if p["doctor"]["license_number"] == f"LIC-{email.split(chr(64))[0]}")
+    client.post(f"/api/v1/organizer/doctors/{entry['doctor']['id']}/approve", headers={"Authorization": f"Bearer {organizer_token}"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DoctorPass123!"})
+    token = login.json()["access_token"]
+
+    # Patient creation requires the doctor to be linked to a hospital --
+    # set up a real verified hospital and link this doctor to it.
+    hosp_email = unique_email("hospital")
+    hosp_reg = client.post("/api/v1/auth/register", json={
+        "email": hosp_email, "password": "HospPass123!", "role": "hospital", "full_name": "Contact",
+        "phone": "1", "address": "a", "hospital_name": f"Test Hospital {hosp_email[:8]}",
+        "hospital_code": f"CODE-{hosp_email.split(chr(64))[0]}", "location": "City",
+        "registration_number": "REG-1", "authorized_contact": "Someone",
+    })
+    hospitals = client.get("/api/v1/hospitals", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    hospital = next(h for h in hospitals["items"] if h["hospital_code"] == f"CODE-{hosp_email.split(chr(64))[0]}")
+    client.post(f"/api/v1/organizer/hospitals/{hospital['id']}/verify", headers={"Authorization": f"Bearer {organizer_token}"})
+
+    client.put("/api/v1/doctors/me", json={"license_number": f"LIC-{email.split(chr(64))[0]}", "hospital_id": hospital["id"]}, headers={"Authorization": f"Bearer {token}"})
+    return token
+
+def test_transplant_case_full_lifecycle(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+    patient = client.post("/api/v1/patients", json={
+        "full_name": "Case Patient", "blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH",
+    }, headers=headers)
+    assert patient.status_code == 200
+    patient_id = patient.json()["id"]
+
+    create = client.post("/api/v1/transplants", json={"patient_id": patient_id}, headers=headers)
+    assert create.status_code == 200
+    case = create.json()
+    assert case["stage"] == "CREATED"
+
+    # Valid forward transitions succeed.
+    for stage in ("MEDICAL_REVIEW", "MATCH_SEARCH", "CANDIDATE_FOUND", "DOCTOR_REVIEW"):
+        r = client.post(f"/api/v1/transplants/{case['id']}/transition", json={"new_stage": stage}, headers=headers)
+        assert r.status_code == 200, r.text
+        assert r.json()["stage"] == stage
+
+    # An invalid skip-ahead transition is rejected by the state machine.
+    bad = client.post(f"/api/v1/transplants/{case['id']}/transition", json={"new_stage": "COMPLETED"}, headers=headers)
+    assert bad.status_code == 400
+
+def test_transplant_case_scoped_to_owning_hospital(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+    patient = client.post("/api/v1/patients", json={
+        "full_name": "Scoped Patient", "blood_group": "A+", "required_organ": "liver", "urgency": "MEDIUM",
+    }, headers=headers).json()
+    case = client.post("/api/v1/transplants", json={"patient_id": patient["id"]}, headers=headers).json()
+
+    other_doc_token = _approved_doctor(client, organizer_token)
+    other_headers = {"Authorization": f"Bearer {other_doc_token}"}
+    r = client.get(f"/api/v1/transplants/{case['id']}", headers=other_headers)
+    assert r.status_code == 404  # not visible outside the owning hospital
+
+def test_transplant_stages_endpoint_matches_state_machine(client, organizer_token):
+    r = client.get("/api/v1/transplants/stages", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    assert "CREATED" in r.json()["stages"]
+    assert "COMPLETED" in r.json()["stages"]
+
+
+# ---------- doctor_workflow's separate upload endpoint must trigger the same AI check + organizer notification as documents.py ----------
+
+def test_doctor_workflow_upload_also_triggers_identity_check(client):
+    email = unique_email("doctor")
+    reg = _register_doctor(client, email)
+    headers = {"Authorization": f"Bearer {reg['upload_token']}"}
+    jpeg = _tiny_jpeg_bytes()
+    r1 = client.post("/api/v1/doctor-workflow/documents", headers=headers,
+                      data={"kind": "profile_photo"}, files={"file": ("s.jpg", jpeg, "image/jpeg")})
+    assert r1.status_code == 200
+    r2 = client.post("/api/v1/doctor-workflow/documents", headers=headers,
+                      data={"kind": "medical_certificate"}, files={"file": ("c.jpg", jpeg, "image/jpeg")})
+    assert r2.status_code == 200
+
+    from app.database import SessionLocal
+    from app.models import DoctorProfile
+    db = SessionLocal()
+    try:
+        profile = db.query(DoctorProfile).filter_by(license_number=f"LIC-{email.split(chr(64))[0]}").first()
+        # Same field the /api/v1/documents path populates -- confirms this
+        # second upload endpoint no longer silently skips the identity check.
+        assert profile.identity_check_confidence is not None
+    finally:
+        db.close()

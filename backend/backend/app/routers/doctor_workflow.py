@@ -8,10 +8,44 @@ from app.models import User, DoctorProfile, Patient, TransplantCase, Document, M
 from app.security import require_role
 from app.services.audit import log_action
 from app.services import object_storage
+from app.services.identity_verification import verify_identity_photos
+from app.services.notifications import notify_organizer
 from app.utils import to_dict, to_dict_list
 from pathlib import Path
+import json
 import uuid
 router=APIRouter(prefix="/api/v1/doctor-workflow",tags=["doctor-workflow"])
+_MEDIA_TYPES={"png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","pdf":"application/pdf"}
+
+def _run_identity_check_and_notify(db,profile,doctor_user):
+    """Shared with app.routers.documents -- both upload paths must trigger
+    the same AI identity check and organizer notification, or a doctor
+    completing registration through this endpoint instead of the other
+    one would silently skip both."""
+    if not (profile.photo_document_id and profile.certificate_document_id):
+        return
+    photo=db.query(Document).filter(Document.id==profile.photo_document_id).first()
+    cert=db.query(Document).filter(Document.id==profile.certificate_document_id).first()
+    if not photo or not cert:
+        return
+    photo_ext=Path(photo.filename).suffix.lstrip(".").lower()
+    cert_ext=Path(cert.filename).suffix.lstrip(".").lower()
+    if cert_ext=="pdf" or photo_ext=="pdf":
+        result={"status":"not_run","same_person_likely":None,"confidence":"unknown","reasoning":"The certificate was submitted as a PDF — automated photo comparison needs an image. An organizer must review it manually."}
+    else:
+        result=verify_identity_photos(object_storage.read(photo.storage_path),_MEDIA_TYPES[photo_ext],object_storage.read(cert.storage_path),_MEDIA_TYPES[cert_ext])
+    profile.identity_check_result=json.dumps(result)
+    profile.identity_check_confidence=result.get("confidence","unknown")
+    db.commit()
+    name=doctor_user.full_name if doctor_user else "A doctor"
+    if result.get("status")=="completed":
+        if result.get("same_person_likely") is True: verdict=f"AI check: the live photo and certificate photo APPEAR TO BE THE SAME PERSON (confidence: {result.get('confidence')})."
+        elif result.get("same_person_likely") is False: verdict=f"AI check: the live photo and certificate photo DO NOT APPEAR TO MATCH (confidence: {result.get('confidence')}) — please review closely, this may indicate a fraudulent submission."
+        else: verdict="AI check: could not clearly determine a match from the submitted photos — manual review needed."
+        detail=f"{verdict} Reasoning: {result.get('reasoning','')}"
+    else:
+        detail=f"AI identity check did not run ({result.get('reasoning',result.get('status'))}) — please compare the two submitted photos manually."
+    notify_organizer("Q-Transplant — doctor documents ready for review",f"{name}'s license and live photo are both uploaded and ready for approval. {detail}")
 class ProfileIn(BaseModel): phone:str; address:str; specialty:str; professional_information:str; hospital_id:Optional[str]=None
 class DecisionIn(BaseModel): patient_id:str; decision:str; notes:Optional[str]=None
 class PatientStatusIn(BaseModel): status:str
@@ -32,7 +66,7 @@ def profile(user=Depends(require_role("doctor")),db:Session=Depends(get_db)):
 def update_profile(body:ProfileIn,user=Depends(require_role("doctor")),db:Session=Depends(get_db)):
  p=db.query(DoctorProfile).filter(DoctorProfile.user_id==user.id).first()
  if not p: raise HTTPException(404,"Doctor profile not found")
- for k,v in body.dict().items(): setattr(p,k,v)
+ for k,v in body.model_dump().items(): setattr(p,k,v)
  if p.approval_status=="REQUESTED_INFO": p.approval_status="ORGANIZER_REVIEW"
  db.commit(); log_action(db,"DOCTOR_PROFILE_UPDATED",user_id=user.id,target=p.id); return to_dict(p)
 
@@ -69,7 +103,9 @@ async def upload_doctor_document(kind:str=Form(...),file:UploadFile=File(...),us
  if kind=="profile_photo": p.photo_document_id=d.id
  if kind=="medical_certificate": p.certificate_document_id=d.id
  if p.approval_status in {"PENDING_APPROVAL","REQUESTED_INFO"} and p.photo_document_id and p.certificate_document_id: p.approval_status="ORGANIZER_REVIEW"
- db.commit(); db.refresh(d); log_action(db,"DOCTOR_DOCUMENT_UPLOADED",user_id=user.id,target=d.id,meta={"kind":kind}); return to_dict(d)
+ db.commit(); db.refresh(d); log_action(db,"DOCTOR_DOCUMENT_UPLOADED",user_id=user.id,target=d.id,meta={"kind":kind})
+ _run_identity_check_and_notify(db,p,user)
+ return to_dict(d)
 
 @router.get("/documents")
 def documents(user=Depends(require_role("doctor")),db:Session=Depends(get_db)): return to_dict_list(db.query(Document).filter(Document.owner_user_id==user.id).order_by(Document.uploaded_at.desc()).all())

@@ -30,7 +30,7 @@ def upsert_my_profile(body: DoctorProfileIn, user: User = Depends(require_role("
     if not profile:
         profile = DoctorProfile(user_id=user.id, license_number=body.license_number)
         db.add(profile)
-    for field, value in body.dict(exclude_unset=True).items():
+    for field, value in body.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)
     db.commit()
     db.refresh(profile)

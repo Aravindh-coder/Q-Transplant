@@ -22,7 +22,7 @@ def create_patient(body:PatientIn,user:User=Depends(require_role("doctor")),db:S
     doctor=_doctor(db,user)
     if not doctor.hospital_id: raise HTTPException(400,"Your doctor profile isn't linked to a hospital yet.")
     if body.age is not None and not 0<body.age<130: raise HTTPException(400,"Invalid patient age")
-    patient=Patient(hospital_id=doctor.hospital_id,doctor_id=doctor.id,**body.dict()); db.add(patient); db.commit(); db.refresh(patient); log_action(db,"PATIENT_CREATED",user_id=user.id,target=patient.id); return to_dict(patient)
+    patient=Patient(hospital_id=doctor.hospital_id,doctor_id=doctor.id,**body.model_dump()); db.add(patient); db.commit(); db.refresh(patient); log_action(db,"PATIENT_CREATED",user_id=user.id,target=patient.id); return to_dict(patient)
 @router.get("")
 def list_my_patients(user:User=Depends(require_role("doctor")),db:Session=Depends(get_db)):
     doctor=_doctor(db,user); patients=db.query(Patient).filter(Patient.doctor_id==doctor.id).all()

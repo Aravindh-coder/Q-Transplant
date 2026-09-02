@@ -7,11 +7,12 @@ from app.models import User, HospitalProfile, Patient, DoctorProfile, Transplant
 from app.security import require_role
 from app.services.audit import log_action
 from app.services.notifications import notify
+from app.services.case_workflow import validate_transition
 from app.utils import to_dict, to_dict_list
 router=APIRouter(prefix="/api/v1/hospital-workflow",tags=["hospital-workflow"])
 class ProfileIn(BaseModel): hospital_name:str; hospital_code:str; phone:str; address:str; location:str; registration_number:str; authorized_contact:str
 class PatientIn(BaseModel): full_name:str; age:Optional[int]=None; gender:Optional[str]=None; blood_group:str; required_organ:str; doctor_id:str; hla_a:Optional[str]=None; hla_b:Optional[str]=None; hla_c:Optional[str]=None; hla_dr:Optional[str]=None; hla_dq:Optional[str]=None; urgency:str="MEDIUM"
-class CaseIn(BaseModel): patient_id:str; donor_id:Optional[str]=None; stage:str="CREATED"
+class CaseIn(BaseModel): patient_id:str; donor_id:Optional[str]=None
 class StatusIn(BaseModel): stage:str
 
 def _hospital(db,user):
@@ -27,7 +28,7 @@ def profile(user=Depends(require_role("hospital")),db:Session=Depends(get_db)): 
 @router.put("/profile")
 def update_profile(body:ProfileIn,user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
  h=_hospital(db,user)
- for k,v in body.dict().items(): setattr(h,k,v)
+ for k,v in body.model_dump().items(): setattr(h,k,v)
  db.commit(); return to_dict(h)
 @router.get("/doctors")
 def doctors(user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
@@ -39,7 +40,7 @@ def patients(user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
 def create_patient(body:PatientIn,user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
  h=_hospital(db,user); d=db.query(DoctorProfile).filter(DoctorProfile.id==body.doctor_id,DoctorProfile.hospital_id==h.id,DoctorProfile.approval_status.in_(["APPROVED","approved"])).first()
  if not d: raise HTTPException(400,"Select an approved doctor associated with this hospital")
- data=body.dict(); data.pop("doctor_id"); p=Patient(hospital_id=h.id,doctor_id=d.id,**data); db.add(p); db.commit(); db.refresh(p); log_action(db,"HOSPITAL_PATIENT_CREATED",user_id=user.id,target=p.id); return to_dict(p)
+ data=body.model_dump(); data.pop("doctor_id"); p=Patient(hospital_id=h.id,doctor_id=d.id,**data); db.add(p); db.commit(); db.refresh(p); log_action(db,"HOSPITAL_PATIENT_CREATED",user_id=user.id,target=p.id); return to_dict(p)
 @router.get("/cases")
 def cases(user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
  h=_hospital(db,user); return to_dict_list(db.query(TransplantCase).filter(TransplantCase.hospital_id==h.id).all())
@@ -47,14 +48,14 @@ def cases(user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
 def create_case(body:CaseIn,user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
  h=_hospital(db,user); p=db.query(Patient).filter(Patient.id==body.patient_id,Patient.hospital_id==h.id).first()
  if not p: raise HTTPException(404,"Patient not found in this hospital")
- c=TransplantCase(patient_id=p.id,hospital_id=h.id,donor_id=body.donor_id,stage=body.stage); db.add(c); db.commit(); db.refresh(c); log_action(db,"TRANSPLANT_CASE_CREATED",user_id=user.id,target=c.id); return to_dict(c)
+ c=TransplantCase(patient_id=p.id,hospital_id=h.id,donor_id=body.donor_id,stage="CREATED"); db.add(c); db.commit(); db.refresh(c); log_action(db,"TRANSPLANT_CASE_CREATED",user_id=user.id,target=c.id); return to_dict(c)
 @router.patch("/cases/{case_id}")
 def update_case(case_id:str,body:StatusIn,user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
  h=_hospital(db,user); c=db.query(TransplantCase).filter(TransplantCase.id==case_id,TransplantCase.hospital_id==h.id).first()
  if not c: raise HTTPException(404,"Case not found")
- allowed={"CREATED","MATCHING","DONOR_ACCEPTED","APPROVED","SCHEDULED","IN_PROGRESS","COMPLETED","CANCELLED","REJECTED"}
- if body.stage not in allowed: raise HTTPException(400,"Invalid case stage")
- c.stage=body.stage; db.commit(); log_action(db,"TRANSPLANT_CASE_UPDATED",user_id=user.id,target=case_id,meta={"stage":body.stage}); return to_dict(c)
+ try: new_stage=validate_transition(c.stage,body.stage)
+ except ValueError as e: raise HTTPException(400,str(e))
+ c.stage=new_stage; db.commit(); log_action(db,"TRANSPLANT_CASE_UPDATED",user_id=user.id,target=case_id,meta={"stage":new_stage}); return to_dict(c)
 @router.get("/documents")
 def documents(user=Depends(require_role("hospital")),db:Session=Depends(get_db)):
  h=_hospital(db,user); ids=[p.id for p in db.query(Patient).filter(Patient.hospital_id==h.id).all()]
