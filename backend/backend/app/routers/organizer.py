@@ -42,6 +42,32 @@ def verify_hospital(hospital_id,user=Depends(require_role("organizer")),db:Sessi
  h=db.query(HospitalProfile).filter(HospitalProfile.id==hospital_id).first()
  if not h: raise HTTPException(404,"Hospital not found")
  h.verification_status="verified"; a=db.query(User).filter(User.id==h.user_id).first(); a.status="active"; a.email_verified=True; db.commit(); notify(db,a,"Hospital verification approved","Your hospital account is verified.",priority="high",also_email=True); log_action(db,"HOSPITAL_VERIFIED",user_id=user.id,target=hospital_id); return {"id":h.id,"verification_status":h.verification_status}
+
+def _donor_review(db,donor):
+ account=db.query(User).filter(User.id==donor.user_id).first()
+ doc=db.query(Document).filter(Document.id==donor.medical_document_id).first() if donor.medical_document_id else None
+ return {"donor":to_dict(donor,exclude={"phone","address","date_of_birth","gender"}),"user":{"id":account.id,"full_name":account.full_name,"email":account.email} if account else None,"medical_document":to_dict(doc),"document_submitted":bool(donor.medical_document_id)}
+@router.get("/donors/pending")
+def pending_donors(user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ return [_donor_review(db,d) for d in db.query(DonorProfile).filter(DonorProfile.verification_status.in_(["pending","under_review"])).all()]
+@router.get("/donors/{donor_id}/review")
+def review_donor(donor_id,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ d=db.query(DonorProfile).filter(DonorProfile.id==donor_id).first()
+ if not d: raise HTTPException(404,"Donor not found")
+ return _donor_review(db,d)
+@router.post("/donors/{donor_id}/verify")
+def verify_donor(donor_id,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ d=db.query(DonorProfile).filter(DonorProfile.id==donor_id).first()
+ if not d: raise HTTPException(404,"Donor not found")
+ if not d.medical_document_id: raise HTTPException(400,"Donor must submit a medical document before verification.")
+ d.verification_status="verified"; account=db.query(User).filter(User.id==d.user_id).first()
+ db.commit(); notify(db,account,"Donor account verified","Your donor profile has been verified and is now visible in hospital searches.",priority="high",also_email=True); log_action(db,"DONOR_VERIFIED",user_id=user.id,target=donor_id); return {"id":d.id,"verification_status":d.verification_status}
+@router.post("/donors/{donor_id}/reject")
+def reject_donor(donor_id,reason="",user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
+ d=db.query(DonorProfile).filter(DonorProfile.id==donor_id).first()
+ if not d: raise HTTPException(404,"Donor not found")
+ d.verification_status="rejected"; account=db.query(User).filter(User.id==d.user_id).first()
+ db.commit(); notify(db,account,"Donor verification rejected",f"Your donor registration was rejected. {reason}".strip(),priority="high",also_email=True); log_action(db,"DONOR_REJECTED",user_id=user.id,target=donor_id,meta={"reason":reason}); return {"id":d.id,"verification_status":d.verification_status}
 @router.get("/users")
 def users(role:str|None=None,search:str|None=None,page:int=1,page_size:int=DEFAULT_PAGE_SIZE,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  page,page_size=bounded_page(page,page_size)

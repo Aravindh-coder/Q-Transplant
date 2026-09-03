@@ -44,6 +44,8 @@ def create_request(body: CreateRequestIn, user: User = Depends(require_role("doc
         raise HTTPException(404, "Donor not found.")
     if donor.availability_status != "active":
         raise HTTPException(409, "Donor is currently inactive and cannot receive a new request.")
+    if donor.verification_status != "verified":
+        raise HTTPException(409, "Donor has not been verified yet and cannot receive a new request.")
     if not body.organ.strip():
         raise HTTPException(400, "organ is required")
     urgency = body.urgency.upper()

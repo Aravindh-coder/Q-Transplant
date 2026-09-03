@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, DonorProfile, Document
+from app.models import User, DonorProfile, Document, HospitalProfile
 from app.security import require_role, hash_password
 from app.services.audit import log_action
 from app.services.search_service import paginate
@@ -34,6 +34,7 @@ class DonorProfileIn(BaseModel):
     hla_dr: Optional[str] = None
     hla_dq: Optional[str] = None
     medical_information: Optional[str] = None
+    hospital_id: Optional[str] = None
 
 
 class DonationStatusIn(BaseModel):
@@ -48,6 +49,18 @@ def upsert_my_profile(body: DonorProfileIn, user: User = Depends(require_role("d
         db.add(profile)
     data = body.model_dump(exclude_unset=True)
     data["blood_group"] = body.blood_group.upper()
+    if "hospital_id" in data and data["hospital_id"]:
+        # The hospital a donor is registering through -- its contact details
+        # are what a requesting hospital sees in search/match results, never
+        # the donor's own identity. Must be a real, organizer-verified
+        # hospital; a stale/changed hospital link resets verification so a
+        # newly-linked hospital can't inherit a prior approval it never
+        # reviewed.
+        hospital = db.query(HospitalProfile).filter(HospitalProfile.id == data["hospital_id"]).first()
+        if not hospital or hospital.verification_status.lower() not in {"verified", "approved"}:
+            raise HTTPException(400, "hospital_id must reference an organizer-verified hospital.")
+        if profile.hospital_id != data["hospital_id"]:
+            profile.verification_status = "pending"
     for field, value in data.items():
         setattr(profile, field, value)
     db.commit()
@@ -114,13 +127,37 @@ def update_donation_status(donor_id: str, body: DonationStatusIn,
     return {"donor_id": donor_id, "donation_status": status, "availability_status": profile.availability_status}
 
 
+_DONOR_PII_FIELDS = {"medical_information", "phone", "address", "date_of_birth", "gender", "user_id", "medical_document_id"}
+
+
+def _donor_search_result(d: DonorProfile, db: Session) -> dict:
+    """What a requesting hospital/doctor is allowed to see about a donor
+    candidate: compatibility-relevant fields only -- never the donor's own
+    phone, address, date of birth, or gender. If the donor registered
+    through a hospital, that hospital's contact details are surfaced
+    instead so the requesting hospital coordinates hospital-to-hospital,
+    never hospital-to-individual-donor directly."""
+    out = to_dict(d, exclude=_DONOR_PII_FIELDS)
+    out["associated_hospital"] = None
+    if d.hospital_id:
+        h = db.query(HospitalProfile).filter(HospitalProfile.id == d.hospital_id).first()
+        if h:
+            out["associated_hospital"] = {
+                "hospital_id": h.id, "hospital_name": h.hospital_name,
+                "phone": h.phone, "address": h.address, "location": h.location,
+                "authorized_contact": h.authorized_contact,
+            }
+    return out
+
+
 @router.get("/search")
 def search_donors(organ: Optional[str] = None, blood_group: Optional[str] = None,
                  page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
                  user: User = Depends(require_role("doctor", "hospital", "organizer")),
                  db: Session = Depends(get_db)):
     page, page_size = bounded_page(page, page_size)
-    q = db.query(DonorProfile).filter(DonorProfile.availability_status == "active")
+    q = db.query(DonorProfile).filter(DonorProfile.availability_status == "active",
+                                       DonorProfile.verification_status == "verified")
     if blood_group:
         q = q.filter(DonorProfile.blood_group == blood_group.upper())
     if organ:
@@ -131,9 +168,9 @@ def search_donors(organ: Optional[str] = None, blood_group: Optional[str] = None
         results = [d for d in candidates if any(o.replace("_partial", "") == organ.lower() for o in (d.organs_available or []))]
         total = len(results)
         page_items = results[(page - 1) * page_size: page * page_size]
-        return {"items": to_dict_list(page_items, exclude={"medical_information"}), "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size}
+        return {"items": [_donor_search_result(d, db) for d in page_items], "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size}
     paginated = paginate(q, page, page_size)
-    return {**paginated, "items": to_dict_list(paginated["items"], exclude={"medical_information"})}
+    return {**paginated, "items": [_donor_search_result(d, db) for d in paginated["items"]]}
 
 
 @router.post("/import")

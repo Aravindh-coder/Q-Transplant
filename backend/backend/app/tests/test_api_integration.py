@@ -841,3 +841,153 @@ def test_quantum_donor_search_works_for_authorized_role(client, organizer_token)
     assert r.status_code == 200
     assert "quantum_inspired" in r.json()
     assert "speedup_ratio" not in r.json()["quantum_inspired"]
+
+
+# ---------- donor verification workflow: medical document required, hospital contact surfaced instead of donor identity ----------
+
+def _verified_donor_with_hospital(client, organizer_token, hospital_id=None, otp=None, prefix="vdonor"):
+    """Registers a donor, uploads a medical document, links a hospital if
+    given, and has the organizer verify -- returns (donor_token, donor_id)."""
+    import random as _r
+    email = unique_email(prefix)
+    otp = otp or str(_r.randint(100000, 999999))
+    with patch("random.SystemRandom.randrange", return_value=int(otp)):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": otp})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    profile_body = {"blood_group": "AB-", "organs_available": ["pancreas"]}
+    if hospital_id:
+        profile_body["hospital_id"] = hospital_id
+    r = client.put("/api/v1/donors/me", json=profile_body, headers=headers)
+    assert r.status_code == 200, r.text
+    donor_id = r.json()["id"]
+
+    jpeg = _tiny_jpeg_bytes()
+    up = client.post("/api/v1/documents?kind=medical_document", headers=headers,
+                      files={"file": ("report.jpg", jpeg, "image/jpeg")})
+    assert up.status_code == 200
+
+    verify = client.post(f"/api/v1/organizer/donors/{donor_id}/verify",
+                          headers={"Authorization": f"Bearer {organizer_token}"})
+    assert verify.status_code == 200
+    return token, donor_id
+
+
+def test_donor_not_searchable_before_verification(client, organizer_token):
+    email = unique_email("unverified")
+    with patch("random.SystemRandom.randrange", return_value=414141):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "414141"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    r = client.put("/api/v1/donors/me", json={"blood_group": "AB-", "organs_available": ["heart"]}, headers=headers)
+    donor_id = r.json()["id"]
+
+    results = client.get("/api/v1/donors/search?blood_group=AB-",
+                          headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    assert donor_id not in [d["id"] for d in results["items"]]
+
+
+def test_organizer_cannot_verify_donor_without_medical_document(client, organizer_token):
+    email = unique_email("nodoc")
+    with patch("random.SystemRandom.randrange", return_value=424242):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "424242"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    r = client.put("/api/v1/donors/me", json={"blood_group": "B-", "organs_available": ["liver"]}, headers=headers)
+    donor_id = r.json()["id"]
+
+    verify = client.post(f"/api/v1/organizer/donors/{donor_id}/verify",
+                          headers={"Authorization": f"Bearer {organizer_token}"})
+    assert verify.status_code == 400
+
+
+def test_verified_donor_appears_in_search_without_personal_fields(client, organizer_token):
+    _, donor_id = _verified_donor_with_hospital(client, organizer_token, prefix="vdonorsearch")
+    results = client.get("/api/v1/donors/search?organ=pancreas&blood_group=AB-",
+                          headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(d for d in results["items"] if d["id"] == donor_id)
+    for pii_field in ("phone", "address", "date_of_birth", "gender", "user_id", "medical_document_id"):
+        assert pii_field not in entry
+
+
+def test_search_shows_associated_hospital_contact_not_donor_identity(client, organizer_token):
+    hospital_token, hospital_id = _verified_hospital(client, organizer_token, "vdonorhosp")
+    _, donor_id = _verified_donor_with_hospital(client, organizer_token, hospital_id=hospital_id, prefix="vdonorwh")
+
+    results = client.get("/api/v1/donors/search?organ=pancreas&blood_group=AB-",
+                          headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    entry = next(d for d in results["items"] if d["id"] == donor_id)
+    assert entry["associated_hospital"] is not None
+    assert entry["associated_hospital"]["hospital_id"] == hospital_id
+    assert "phone" in entry["associated_hospital"]
+
+
+def test_donor_cannot_link_unverified_hospital(client, organizer_token):
+    email = unique_email("donorbadhosp")
+    reg = client.post("/api/v1/auth/register", json={
+        "email": email, "password": "DonorPass123!", "role": "donor", "full_name": "D",
+        "phone": "1", "address": "a", "blood_group": "O+",
+    })
+    with patch("random.SystemRandom.randrange", return_value=434343):
+        pass
+    otp_email = unique_email("donorbadhosp2")
+    with patch("random.SystemRandom.randrange", return_value=434343):
+        _register_donor(client, otp_email)
+    client.post("/api/v1/auth/verify-email", json={"email": otp_email, "otp": "434343"})
+    login = client.post("/api/v1/auth/login", json={"email": otp_email, "password": "DonorPass123!"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    unverified_hosp_email = unique_email("unverifiedhosp")
+    client.post("/api/v1/auth/register", json={
+        "email": unverified_hosp_email, "password": "HospPass123!", "role": "hospital", "full_name": "Contact",
+        "phone": "1", "address": "a", "hospital_name": "Unverified Hosp",
+        "hospital_code": f"CODE-{unverified_hosp_email.split(chr(64))[0]}", "location": "City",
+        "registration_number": "REG-1", "authorized_contact": "Someone",
+    })
+    hospitals = client.get("/api/v1/hospitals", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    unverified_hospital = next(h for h in hospitals["items"] if h["hospital_code"] == f"CODE-{unverified_hosp_email.split(chr(64))[0]}")
+
+    r = client.put("/api/v1/donors/me", json={"blood_group": "O+", "hospital_id": unverified_hospital["id"]}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_matching_run_only_considers_verified_donors(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+    patient = client.post("/api/v1/patients", json={
+        "full_name": "Verified Match Patient", "blood_group": "O+", "required_organ": "kidney", "urgency": "HIGH",
+    }, headers=headers).json()
+
+    email = unique_email("unverifiedmatch")
+    with patch("random.SystemRandom.randrange", return_value=454545):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "454545"})
+    donor_login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    donor_headers = {"Authorization": f"Bearer {donor_login.json()['access_token']}"}
+    unverified_donor = client.put("/api/v1/donors/me", json={"blood_group": "O+", "organs_available": ["kidney"]}, headers=donor_headers).json()
+
+    r = client.post(f"/api/v1/matching/run/{patient['id']}", headers=headers)
+    assert r.status_code == 200
+    donor_ids = [m["donor_id"] for m in r.json()["matches"]]
+    assert unverified_donor["id"] not in donor_ids
+
+
+def test_donor_request_blocked_against_unverified_donor(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+
+    email = unique_email("unverifiedreq")
+    with patch("random.SystemRandom.randrange", return_value=464646):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "464646"})
+    donor_login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    donor_headers = {"Authorization": f"Bearer {donor_login.json()['access_token']}"}
+    unverified_donor = client.put("/api/v1/donors/me", json={"blood_group": "O+", "organs_available": ["kidney"]}, headers=donor_headers).json()
+
+    r = client.post("/api/v1/donor-requests", json={"donor_id": unverified_donor["id"], "organ": "kidney"}, headers=headers)
+    assert r.status_code == 409
