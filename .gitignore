@@ -1,4 +1,5 @@
 .env
+config_secrets.h
 *.db
 uploads/
 node_modules/
