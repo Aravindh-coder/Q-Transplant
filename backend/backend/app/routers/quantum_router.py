@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DonorProfile
+from app.models import DonorProfile, User
+from app.security import require_role
 from app.services.quantum.search import classical_search, quantum_inspired_search
 from app.services.quantum.benchmark import run_benchmark
 from app.services.quantum.grover_sim import simulate_grover_steps
@@ -43,19 +44,26 @@ def get_quantum_benchmark():
     return {"benchmark": results}
 
 @router.get("/search-donors")
-def search_donors_quantum(organ: str, blood_group: str, db: Session = Depends(get_db)):
+def search_donors_quantum(organ: str, blood_group: str,
+                           user: User = Depends(require_role("doctor", "hospital", "organizer")),
+                           db: Session = Depends(get_db)):
+    """Was previously unauthenticated and returned donor IDs, blood groups,
+    and organ availability for every active donor to anyone -- brought in
+    line with every other donor-data endpoint (donors.py /search,
+    matching.py /search), which all require an authorized clinical role.
+    HLA fields are fetched for scoring context only and are never included
+    in the response, consistent with the exclude={"medical_information"}/
+    minimum-necessary pattern used elsewhere."""
     donors = db.query(DonorProfile).filter(DonorProfile.availability_status == "active").all()
-    
+
     candidates = []
     for d in donors:
         candidates.append({
             "id": d.id,
-            "name": f"Donor {d.id[:8]}",
             "blood_group": d.blood_group,
             "organs": d.organs_available or [],
-            "hla": {"hla_a": d.hla_a, "hla_b": d.hla_b, "hla_c": d.hla_c, "hla_dr": d.hla_dr, "hla_dq": d.hla_dq}
         })
-    
+
     def score_fn(c: dict) -> float:
         score = 0.0
         if c["blood_group"] == blood_group.upper():
@@ -66,7 +74,7 @@ def search_donors_quantum(organ: str, blood_group: str, db: Session = Depends(ge
 
     classical_res = classical_search(candidates, score_fn)
     quantum_res = quantum_inspired_search(candidates, score_fn)
-    
+
     return {
         "candidates_evaluated_count": len(candidates),
         "classical": {
@@ -74,10 +82,15 @@ def search_donors_quantum(organ: str, blood_group: str, db: Session = Depends(ge
             "best_score": classical_res["best_score"],
             "best_donor_id": classical_res["best"]["id"] if classical_res["best"] else None
         },
-        "quantum_grover": {
+        "quantum_inspired": {
+            # Classical amplitude-amplification-style heuristic -- no
+            # quantum hardware involved and no guaranteed speedup. This
+            # ratio reflects evaluation count on this run only, not a
+            # theoretical or proven advantage.
             "evaluations": quantum_res["evaluations"],
             "best_score": quantum_res["best_score"],
             "best_donor_id": quantum_res["best"]["id"] if quantum_res["best"] else None,
-            "speedup_ratio": f"{classical_res['evaluations'] / max(1, quantum_res['evaluations']):.2f}x"
+            "evaluation_ratio_this_run": f"{classical_res['evaluations'] / max(1, quantum_res['evaluations']):.2f}x",
+            "same_optimum_found": classical_res["best"]["id"] == quantum_res["best"]["id"] if classical_res["best"] and quantum_res["best"] else None
         }
     }

@@ -123,6 +123,14 @@ def run_match_for_patient(patient_id: str, user: User = Depends(require_role("do
 
 @router.get("/history/{patient_id}")
 def match_history(patient_id: str,user: User=Depends(require_role("doctor","hospital","organizer")),db:Session=Depends(get_db)):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient: raise HTTPException(404, "Patient not found.")
+    if user.role == "doctor":
+        doctor = db.query(DoctorProfile).filter(DoctorProfile.user_id == user.id).first()
+        if not doctor or doctor.hospital_id != patient.hospital_id: raise HTTPException(403, "You are not authorized for this patient.")
+    elif user.role == "hospital":
+        hospital = db.query(HospitalProfile).filter(HospitalProfile.user_id == user.id).first()
+        if not hospital or hospital.id != patient.hospital_id: raise HTTPException(403, "You are not authorized for this patient.")
     requests=db.query(MatchRequest).filter(MatchRequest.patient_id==patient_id).all(); out=[]
     for r in requests:
         results=db.query(MatchResult).filter(MatchResult.match_request_id==r.id).order_by(MatchResult.rank).all(); out.append({"request":to_dict(r),"results":to_dict_list(results)})

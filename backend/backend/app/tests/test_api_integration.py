@@ -750,3 +750,94 @@ def test_doctor_workflow_upload_also_triggers_identity_check(client):
         assert profile.identity_check_confidence is not None
     finally:
         db.close()
+
+
+# ---------- security regression tests: device provisioning, match history, quantum donor search ----------
+
+def _verified_hospital(client, organizer_token, prefix="hospsec"):
+    email = unique_email(prefix)
+    reg = client.post("/api/v1/auth/register", json={
+        "email": email, "password": "HospPass123!", "role": "hospital", "full_name": "Contact",
+        "phone": "1", "address": "a", "hospital_name": f"Security Test Hospital {email[:8]}",
+        "hospital_code": f"CODE-{email.split(chr(64))[0]}", "location": "City",
+        "registration_number": "REG-1", "authorized_contact": "Someone",
+    })
+    assert reg.status_code == 200
+    hospitals = client.get("/api/v1/hospitals", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    hospital = next(h for h in hospitals["items"] if h["hospital_code"] == f"CODE-{email.split(chr(64))[0]}")
+    verify = client.post(f"/api/v1/organizer/hospitals/{hospital['id']}/verify", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert verify.status_code == 200
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "HospPass123!"})
+    assert login.status_code == 200
+    return login.json()["access_token"], hospital["id"]
+
+
+def test_hospital_cannot_provision_device_for_another_hospital(client, organizer_token):
+    _, hospital_a_id = _verified_hospital(client, organizer_token, "hospA")
+    hospital_b_token, _ = _verified_hospital(client, organizer_token, "hospB")
+    r = client.post(f"/api/v1/devices/provision?hospital_id={hospital_a_id}",
+                     headers={"Authorization": f"Bearer {hospital_b_token}"})
+    assert r.status_code == 403
+
+
+def test_hospital_can_provision_device_for_own_hospital(client, organizer_token):
+    hospital_token, hospital_id = _verified_hospital(client, organizer_token, "hospOwn")
+    r = client.post(f"/api/v1/devices/provision?hospital_id={hospital_id}",
+                     headers={"Authorization": f"Bearer {hospital_token}"})
+    assert r.status_code == 200
+    assert "device_token" in r.json()
+
+
+def test_organizer_can_still_provision_device_for_any_hospital(client, organizer_token):
+    _, hospital_id = _verified_hospital(client, organizer_token, "hospOrg")
+    r = client.post(f"/api/v1/devices/provision?hospital_id={hospital_id}",
+                     headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+
+
+def test_match_history_not_visible_to_other_hospitals_doctor(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+    patient = client.post("/api/v1/patients", json={
+        "full_name": "History Patient", "blood_group": "B+", "required_organ": "kidney", "urgency": "HIGH",
+    }, headers=headers).json()
+
+    other_doc_token = _approved_doctor(client, organizer_token)
+    other_headers = {"Authorization": f"Bearer {other_doc_token}"}
+    r = client.get(f"/api/v1/matching/history/{patient['id']}", headers=other_headers)
+    assert r.status_code == 403
+
+
+def test_match_history_visible_to_owning_doctor(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+    patient = client.post("/api/v1/patients", json={
+        "full_name": "History Patient Own", "blood_group": "AB+", "required_organ": "liver", "urgency": "MEDIUM",
+    }, headers=headers).json()
+    r = client.get(f"/api/v1/matching/history/{patient['id']}", headers=headers)
+    assert r.status_code == 200
+
+
+def test_quantum_donor_search_requires_authentication(client):
+    r = client.get("/api/v1/quantum/search-donors?organ=kidney&blood_group=O+")
+    assert r.status_code == 401
+
+
+def test_quantum_donor_search_blocked_for_donor_role(client):
+    email = unique_email("donorqsec")
+    with patch("random.SystemRandom.randrange", return_value=555555):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "555555"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    token = login.json()["access_token"]
+    r = client.get("/api/v1/quantum/search-donors?organ=kidney&blood_group=O+",
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+
+def test_quantum_donor_search_works_for_authorized_role(client, organizer_token):
+    r = client.get("/api/v1/quantum/search-donors?organ=kidney&blood_group=O+",
+                    headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    assert "quantum_inspired" in r.json()
+    assert "speedup_ratio" not in r.json()["quantum_inspired"]

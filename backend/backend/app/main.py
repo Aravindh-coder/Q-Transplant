@@ -101,8 +101,9 @@ def health():
     try:
         with engine.connect() as conn: conn.execute(text("SELECT 1"))
         return {"status":"ok","database":"connected"}
-    except Exception as e:
-        return {"status":"ok","database":"unreachable","detail":str(e)}
+    except Exception:
+        logger.exception("Health check: database unreachable.")
+        return {"status":"degraded","database":"unreachable"}
 # Mounted last so it never shadows the API routes above — this serves
 # public/index.html at "/", and public/app.html, public/donor.html, and
 # static assets by filename. Same-origin means the frontend's fetch calls
