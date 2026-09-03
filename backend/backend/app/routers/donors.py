@@ -174,13 +174,20 @@ def search_donors(organ: Optional[str] = None, blood_group: Optional[str] = None
 
 
 @router.post("/import")
-async def import_donors_csv(file: UploadFile = File(...),
+async def import_donors_csv(file: UploadFile = File(...), hospital_id: Optional[str] = None,
                              user: User = Depends(require_role("doctor", "hospital", "organizer")),
                              db: Session = Depends(get_db)):
     """Bulk-import a donor dataset from a CSV file. Deliberately not
     available to the donor role -- this creates OTHER people's records in
     bulk, which is an operational/administrative action, not something a
     donor account should be able to do to itself or others.
+
+    Every imported donor is associated with a hospital, same as an
+    individually-registered donor -- a hospital-role importer defaults to
+    their own hospital if hospital_id is omitted; a doctor/organizer must
+    supply one explicitly. This keeps the invariant that
+    /donors/search and match results always have a real hospital's
+    contact info to show instead of donor identity.
 
     Expected columns (case-insensitive, extra columns ignored):
     full_name, email, blood_group (required), organs_available (comma or
@@ -191,6 +198,17 @@ async def import_donors_csv(file: UploadFile = File(...),
     hashing per-row was the exact bug that made seed_donors.py take
     unreasonably long for a dataset this size; this avoids repeating it.
     """
+    if user.role == "hospital" and not hospital_id:
+        own_hospital = db.query(HospitalProfile).filter(HospitalProfile.user_id == user.id).first()
+        hospital_id = own_hospital.id if own_hospital else None
+    if not hospital_id:
+        raise HTTPException(400, "hospital_id is required for import (a hospital-role user may omit it to default to their own hospital).")
+    hospital = db.query(HospitalProfile).filter(HospitalProfile.id == hospital_id).first()
+    if not hospital or hospital.verification_status.lower() not in {"verified", "approved"}:
+        raise HTTPException(400, "hospital_id must reference an organizer-verified hospital.")
+    if user.role == "hospital" and hospital.user_id != user.id:
+        raise HTTPException(403, "You can only import donors under your own hospital.")
+
     if not (file.filename or "").lower().endswith(".csv"):
         raise HTTPException(400, "Only .csv files are accepted.")
     raw = await file.read(10 * 1024 * 1024 + 1)
@@ -244,9 +262,29 @@ async def import_donors_csv(file: UploadFile = File(...),
             hla_a=get("hla_a") or None, hla_b=get("hla_b") or None, hla_c=get("hla_c") or None,
             hla_dr=get("hla_dr") or None, hla_dq=get("hla_dq") or None,
             availability_status="active", donation_status="ACTIVE", verification_status="pending",
+            hospital_id=hospital_id,
         ))
         created += 1
 
     db.commit()
-    log_action(db, "DONORS_IMPORTED", user_id=user.id, meta={"created": created, "skipped": len(skipped), "rows": len(rows)})
+    log_action(db, "DONORS_IMPORTED", user_id=user.id, meta={"created": created, "skipped": len(skipped), "rows": len(rows), "hospital_id": hospital_id})
     return {"rows_processed": len(rows), "created": created, "skipped_count": len(skipped), "skipped": skipped[:50]}
+
+
+@router.get("/{donor_id}")
+def get_donor(donor_id: str, user: User = Depends(require_role("doctor", "hospital", "organizer")),
+              db: Session = Depends(get_db)):
+    """Drill-down detail for a single donor found via search -- same
+    minimum-necessary shape as /search (no donor phone/address/DOB/gender;
+    the registering hospital's contact info in its place). Organizer can
+    look up any donor for admin/review purposes; doctor/hospital can only
+    look up donors that are actually verified and active, i.e. the same
+    set /donors/search would have shown them in the first place.
+    Registered last in this file (after /me, /search, /import) so those
+    literal paths are never shadowed by this catch-all path parameter."""
+    d = db.query(DonorProfile).filter(DonorProfile.id == donor_id).first()
+    if not d:
+        raise HTTPException(404, "Donor not found.")
+    if user.role != "organizer" and (d.availability_status != "active" or d.verification_status != "verified"):
+        raise HTTPException(404, "Donor not found.")
+    return _donor_search_result(d, db)

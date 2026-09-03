@@ -41,6 +41,7 @@ def request_doctor_information(doctor_id,message="Please provide the requested a
 def verify_hospital(hospital_id,user=Depends(require_role("organizer")),db:Session=Depends(get_db)):
  h=db.query(HospitalProfile).filter(HospitalProfile.id==hospital_id).first()
  if not h: raise HTTPException(404,"Hospital not found")
+ if not h.license_document_id: raise HTTPException(400,"Hospital must submit a registration/license document before verification.")
  h.verification_status="verified"; a=db.query(User).filter(User.id==h.user_id).first(); a.status="active"; a.email_verified=True; db.commit(); notify(db,a,"Hospital verification approved","Your hospital account is verified.",priority="high",also_email=True); log_action(db,"HOSPITAL_VERIFIED",user_id=user.id,target=hospital_id); return {"id":h.id,"verification_status":h.verification_status}
 
 def _donor_review(db,donor):
@@ -60,6 +61,7 @@ def verify_donor(donor_id,user=Depends(require_role("organizer")),db:Session=Dep
  d=db.query(DonorProfile).filter(DonorProfile.id==donor_id).first()
  if not d: raise HTTPException(404,"Donor not found")
  if not d.medical_document_id: raise HTTPException(400,"Donor must submit a medical document before verification.")
+ if not d.hospital_id: raise HTTPException(400,"Donor must be linked to a verified hospital before verification -- this is what appears in search results in place of the donor's own identity.")
  d.verification_status="verified"; account=db.query(User).filter(User.id==d.user_id).first()
  db.commit(); notify(db,account,"Donor account verified","Your donor profile has been verified and is now visible in hospital searches.",priority="high",also_email=True); log_action(db,"DONOR_VERIFIED",user_id=user.id,target=donor_id); return {"id":d.id,"verification_status":d.verification_status}
 @router.post("/donors/{donor_id}/reject")

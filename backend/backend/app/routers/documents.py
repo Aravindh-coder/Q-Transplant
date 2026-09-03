@@ -6,7 +6,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Document, DoctorProfile, HospitalProfile, DonorProfile
-from app.security import get_current_user
+from app.security import get_current_user, rate_limit_by_user
+from app.config import settings
 from app.services.audit import log_action
 from app.services.identity_verification import verify_identity_photos
 from app.services import object_storage
@@ -63,7 +64,9 @@ def _run_identity_check_if_ready(db: Session, profile: DoctorProfile):
 
 
 @router.post("")
-async def upload_document(kind: str, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def upload_document(kind: str, file: UploadFile = File(...),
+                           user: User = Depends(rate_limit_by_user("document_upload", settings.UPLOAD_RATE_LIMIT, settings.RATE_LIMIT_WINDOW_MINUTES)),
+                           db: Session = Depends(get_db)):
     ext = Path(file.filename or "").suffix.lower().lstrip(".")
     if ext not in ALLOWED:
         raise HTTPException(400, "Only PDF, PNG and JPEG documents are allowed.")
