@@ -1120,3 +1120,11 @@ def test_donor_blocked_from_full_hospital_list(client, organizer_token):
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     r = client.get("/api/v1/hospitals", headers=headers)
     assert r.status_code == 403
+
+
+# ---------- health check ----------
+
+def test_health_check_ok(client):
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
