@@ -1092,3 +1092,31 @@ def test_document_upload_rate_limited(client, organizer_token):
         last_status = client.post("/api/v1/documents?kind=medical_document", headers=headers,
                                    files={"file": ("r.jpg", jpeg, "image/jpeg")}).status_code
     assert last_status == 429
+
+
+# ---------- hospital directory: donors need a way to see verified hospitals to register through ----------
+
+def test_hospital_directory_visible_to_donor_minimal_fields(client, organizer_token):
+    _, hospital_id = _verified_hospital(client, organizer_token, "directoryhosp")
+    email = unique_email("directorydonor")
+    with patch("random.SystemRandom.randrange", return_value=515151):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "515151"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    r = client.get("/api/v1/hospitals/directory", headers=headers)
+    assert r.status_code == 200
+    entry = next(h for h in r.json() if h["id"] == hospital_id)
+    assert set(entry.keys()) == {"id", "hospital_name", "location"}
+
+
+def test_donor_blocked_from_full_hospital_list(client, organizer_token):
+    email = unique_email("blockedhospdonor")
+    with patch("random.SystemRandom.randrange", return_value=525252):
+        _register_donor(client, email)
+    client.post("/api/v1/auth/verify-email", json={"email": email, "otp": "525252"})
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "DonorPass123!"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    r = client.get("/api/v1/hospitals", headers=headers)
+    assert r.status_code == 403

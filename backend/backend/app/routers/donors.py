@@ -83,7 +83,8 @@ def get_my_status(user: User = Depends(require_role("donor")), db: Session = Dep
     if not profile:
         raise HTTPException(404, "No donor profile yet.")
     return {"availability_status": profile.availability_status, "donation_status": profile.donation_status,
-            "verification_status": profile.verification_status}
+            "verification_status": profile.verification_status,
+            "has_hospital_link": bool(profile.hospital_id), "has_medical_document": bool(profile.medical_document_id)}
 
 
 @router.post("/me/availability")
