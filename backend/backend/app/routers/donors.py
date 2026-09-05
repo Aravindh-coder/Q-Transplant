@@ -19,6 +19,11 @@ router = APIRouter(prefix="/api/v1/donors", tags=["donors"])
 DONATION_STATUSES = {"ACTIVE", "UNDER REVIEW", "MATCHED", "DONATION IN PROCESS", "COMPLETED", "INACTIVE"}
 VALID_BLOOD_GROUPS = {"O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"}
 MAX_IMPORT_ROWS = 5000
+# Raw HLA typing and free-text medical notes are restricted clinical data --
+# a browse/search view doesn't need either. HLA detail for a specific,
+# authorized candidate is available only via the ownership-checked, audited
+# /api/v1/hla/compare/{donor_id}/{patient_id} endpoint.
+_SEARCH_EXCLUDE = {"medical_information", "hla_a", "hla_b", "hla_c", "hla_dr", "hla_dq"}
 
 
 class DonorProfileIn(BaseModel):
@@ -131,9 +136,9 @@ def search_donors(organ: Optional[str] = None, blood_group: Optional[str] = None
         results = [d for d in candidates if any(o.replace("_partial", "") == organ.lower() for o in (d.organs_available or []))]
         total = len(results)
         page_items = results[(page - 1) * page_size: page * page_size]
-        return {"items": to_dict_list(page_items, exclude={"medical_information"}), "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size}
+        return {"items": to_dict_list(page_items, exclude=_SEARCH_EXCLUDE), "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size}
     paginated = paginate(q, page, page_size)
-    return {**paginated, "items": to_dict_list(paginated["items"], exclude={"medical_information"})}
+    return {**paginated, "items": to_dict_list(paginated["items"], exclude=_SEARCH_EXCLUDE)}
 
 
 @router.post("/import")

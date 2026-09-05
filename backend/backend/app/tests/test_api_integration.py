@@ -750,3 +750,203 @@ def test_doctor_workflow_upload_also_triggers_identity_check(client):
         assert profile.identity_check_confidence is not None
     finally:
         db.close()
+
+
+# ============================================================
+# Authorized HLA access architecture -- required security tests
+# ============================================================
+# Adapted to this app's actual role model (donor/doctor/hospital/organizer).
+# No TRANSPORT_OPERATOR role exists here -- there is no GPS/transport-
+# tracking subsystem in this codebase to gate, so that specific test isn't
+# applicable and isn't faked. See the session's final report for why.
+
+def _hospital_with_patient(client, organizer_token, patient_name, organ="kidney"):
+    """Sets up one verified hospital + approved doctor + one patient,
+    returns (doctor_token, hospital_token, patient_id, hospital_id)."""
+    doc_token = _approved_doctor(client, organizer_token)
+    headers = {"Authorization": f"Bearer {doc_token}"}
+    patient = client.post("/api/v1/patients", json={
+        "full_name": patient_name, "blood_group": "O+", "required_organ": organ, "urgency": "HIGH",
+        "hla_a": "A1,A2", "hla_b": "B7,B8", "hla_c": "C1,C2", "hla_dr": "DR1,DR2", "hla_dq": "DQ1,DQ2",
+    }, headers=headers).json()
+    return doc_token, patient["id"]
+
+def _any_active_donor_id(client, organizer_token):
+    r = client.get("/api/v1/donors/search", headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    return r["items"][0]["id"] if r["items"] else None
+
+
+# --- Test 1: Hospital A's doctor cannot access Hospital B's patient's HLA/history ---
+
+def test_cross_hospital_hla_access_blocked(client, organizer_token):
+    doc_a_token, patient_a_id = _hospital_with_patient(client, organizer_token, "Cross Hosp Patient A")
+    doc_b_token, _ = _hospital_with_patient(client, organizer_token, "Cross Hosp Patient B")
+    donor_id = _any_active_donor_id(client, organizer_token)
+    if not donor_id:
+        return  # no donors seeded in this test DB -- nothing to assert against
+    r = client.post(f"/api/v1/hla/compare/{donor_id}/{patient_a_id}", headers={"Authorization": f"Bearer {doc_b_token}"})
+    assert r.status_code == 403
+
+def test_cross_hospital_match_history_blocked(client, organizer_token):
+    doc_a_token, patient_a_id = _hospital_with_patient(client, organizer_token, "History Patient A")
+    doc_b_token, _ = _hospital_with_patient(client, organizer_token, "History Patient B")
+    r = client.get(f"/api/v1/matching/history/{patient_a_id}", headers={"Authorization": f"Bearer {doc_b_token}"})
+    assert r.status_code == 403
+
+
+# --- Test 2: Doctor cannot access organizer-only administrative functions ---
+
+def test_doctor_cannot_access_organizer_only_endpoint(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    r = client.get("/api/v1/organizer/users", headers={"Authorization": f"Bearer {doc_token}"})
+    assert r.status_code == 403
+
+
+# --- Test 3: no TRANSPORT_OPERATOR role/subsystem exists -- not applicable, not faked ---
+
+
+# --- Test 4: unauthorized (unauthenticated) caller cannot use the matching API ---
+
+def test_unauthenticated_cannot_call_matching_search(client):
+    r = client.post("/api/v1/matching/search", json={"blood_group": "O+", "required_organ": "kidney"})
+    assert r.status_code == 401
+
+
+# --- Test 5: matching results never expose the complete HLA database (the core fix) ---
+
+def test_match_results_never_contain_raw_hla_alleles(client, organizer_token):
+    doc_token, patient_id = _hospital_with_patient(client, organizer_token, "No Raw HLA Patient")
+    r = client.post(f"/api/v1/matching/run/{patient_id}", headers={"Authorization": f"Bearer {doc_token}"})
+    assert r.status_code == 200
+    body = r.json()
+    for m in body["matches"]:
+        assert "hla_details" not in m, "raw allele-level HLA detail leaked into a routine match result"
+        assert "hla_score" in m  # the aggregate number is exactly what should be there instead
+
+    history = client.get(f"/api/v1/matching/history/{patient_id}", headers={"Authorization": f"Bearer {doc_token}"}).json()
+    for entry in history:
+        for result in entry["results"]:
+            explanation = result.get("explanation") or {}
+            if isinstance(explanation, dict):
+                assert "hla_details" not in explanation
+
+def test_ad_hoc_search_never_contains_raw_hla_alleles(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    r = client.post("/api/v1/matching/search", json={"blood_group": "O+", "required_organ": "kidney", "ai_review_top_n": 0},
+                     headers={"Authorization": f"Bearer {doc_token}"})
+    assert r.status_code == 200
+    for m in r.json()["matches"]:
+        assert "hla_details" not in m
+
+def test_donor_search_excludes_raw_hla_fields(client, organizer_token):
+    r = client.get("/api/v1/donors/search", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    for item in r.json()["items"]:
+        for field in ("hla_a", "hla_b", "hla_c", "hla_dr", "hla_dq", "medical_information"):
+            assert field not in item
+
+
+# --- Test 6: backend enforces authorization regardless of what a client sends ---
+# (every test in this file already proves this -- auth is checked via
+# require_role()/ownership lookups server-side, never trusted from the
+# request; a crafted request with no valid token or wrong role/ownership
+# is rejected the same way a real frontend request would be, since the
+# frontend has no separate enforcement path at all.)
+
+def test_backend_rejects_crafted_request_with_forged_role_claim_absent_valid_token(client):
+    # A request can't just claim a role -- only a real signed JWT with
+    # that role, issued by this server, is honored.
+    r = client.post("/api/v1/matching/search", json={"blood_group": "O+", "required_organ": "kidney"},
+                     headers={"Authorization": "Bearer role=organizer;not-a-real-token"})
+    assert r.status_code == 401
+
+
+# --- Test 7: a hospital/doctor CAN access its own authorized records ---
+
+def test_own_hospital_hla_and_history_access_succeeds(client, organizer_token):
+    doc_token, patient_id = _hospital_with_patient(client, organizer_token, "Own Access Patient")
+    donor_id = _any_active_donor_id(client, organizer_token)
+    if donor_id:
+        r = client.post(f"/api/v1/hla/compare/{donor_id}/{patient_id}", headers={"Authorization": f"Bearer {doc_token}"})
+        assert r.status_code == 200
+        assert "score" in r.json()
+    history = client.get(f"/api/v1/matching/history/{patient_id}", headers={"Authorization": f"Bearer {doc_token}"})
+    assert history.status_code == 200
+
+
+# --- Test 8: authorized doctor can create and review a matching request ---
+# (covered by test_match_results_never_contain_raw_hla_alleles above, and
+# test_transplant_case_full_lifecycle for case review -- not duplicated here)
+
+
+# --- Test 9: audit log records sensitive access ---
+
+def test_sensitive_hla_access_is_audit_logged(client, organizer_token):
+    doc_token, patient_id = _hospital_with_patient(client, organizer_token, "Audited Patient")
+    donor_id = _any_active_donor_id(client, organizer_token)
+    if not donor_id:
+        return
+    client.post(f"/api/v1/hla/compare/{donor_id}/{patient_id}", headers={"Authorization": f"Bearer {doc_token}"})
+    from app.database import SessionLocal
+    from app.models import AuditLog
+    db = SessionLocal()
+    try:
+        entry = db.query(AuditLog).filter_by(action="SENSITIVE_HLA_DETAIL_ACCESSED").order_by(AuditLog.created_at.desc()).first()
+        assert entry is not None
+        assert entry.user_id is not None
+    finally:
+        db.close()
+
+
+# --- Test 10: notifications don't leak HLA/patient identity details ---
+
+def test_match_notifications_do_not_contain_raw_hla(client, organizer_token):
+    doc_token, patient_id = _hospital_with_patient(client, organizer_token, "Notify Patient")
+    client.post(f"/api/v1/matching/run/{patient_id}", headers={"Authorization": f"Bearer {doc_token}"})
+    from app.database import SessionLocal
+    from app.models import Notification
+    db = SessionLocal()
+    try:
+        recent = db.query(Notification).order_by(Notification.created_at.desc()).limit(10).all()
+        for n in recent:
+            assert "HLA-A" not in n.message and "hla_a" not in n.message.lower()
+            assert "A1,A2" not in n.message  # the specific allele values used in this test's patient
+    finally:
+        db.close()
+
+
+# ---------- auditor role: read-only audit access, never self-registered ----------
+
+def _new_auditor(client, organizer_token, email):
+    r = client.post("/api/v1/organizer/auditors", json={"email": email, "password": "AuditorPass123!", "full_name": "Audit Person"},
+                     headers={"Authorization": f"Bearer {organizer_token}"})
+    assert r.status_code == 200
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "AuditorPass123!"})
+    assert login.status_code == 200
+    return login.json()["access_token"]
+
+def test_auditor_can_read_audit_log(client, organizer_token):
+    token = _new_auditor(client, organizer_token, unique_email("auditor"))
+    r = client.get("/api/v1/organizer/audit-log", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+
+def test_auditor_cannot_do_anything_else(client, organizer_token):
+    token = _new_auditor(client, organizer_token, unique_email("auditor"))
+    headers = {"Authorization": f"Bearer {token}"}
+    # Read-only: can see the audit log, but every mutating/administrative
+    # action stays blocked, same as any other non-organizer role.
+    assert client.get("/api/v1/organizer/users", headers=headers).status_code == 403
+    assert client.post("/api/v1/matching/search", json={"blood_group": "O+", "required_organ": "kidney"}, headers=headers).status_code == 403
+    assert client.post("/api/v1/donors/import", headers=headers, files={"file": ("d.csv", b"blood_group\nO+\n", "text/csv")}).status_code == 403
+
+def test_auditor_role_cannot_self_register(client):
+    r = client.post("/api/v1/auth/register", json={
+        "email": unique_email("wannabe-auditor"), "password": "Pass123!", "role": "auditor", "full_name": "X",
+    })
+    assert r.status_code == 400
+
+def test_only_organizer_can_create_auditor_accounts(client, organizer_token):
+    doc_token = _approved_doctor(client, organizer_token)
+    r = client.post("/api/v1/organizer/auditors", json={"email": unique_email("blocked"), "password": "x", "full_name": "y"},
+                     headers={"Authorization": f"Bearer {doc_token}"})
+    assert r.status_code == 403

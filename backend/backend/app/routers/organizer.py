@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, DoctorProfile, DonorProfile, HospitalProfile, Patient, TransplantCase, AuditLog, MatchRequest, MatchResult, EmergencyRequest, Document
@@ -93,4 +94,30 @@ def matching_requests(page:int=1,page_size:int=DEFAULT_PAGE_SIZE,user=Depends(re
  paginated=paginate(db.query(MatchRequest).order_by(MatchRequest.created_at.desc()),page,page_size)
  return {**paginated,"items":to_dict_list(paginated["items"])}
 @router.get("/audit-log")
-def audit_log(limit:int=100,user=Depends(require_role("organizer")),db:Session=Depends(get_db)): return to_dict_list(db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all())
+def audit_log(limit:int=100,user=Depends(require_role("organizer","auditor")),db:Session=Depends(get_db)): return to_dict_list(db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all())
+
+class AuditorIn(BaseModel):
+    email: str
+    password: str
+    full_name: str
+
+@router.post("/auditors")
+def create_auditor(body: AuditorIn, user=Depends(require_role("organizer")), db: Session = Depends(get_db)):
+    """Auditor accounts are never self-registered -- /api/v1/auth/register
+    only ever accepts donor/doctor/hospital. An auditor gets read-only
+    access to the full audit trail (every sensitive action across the
+    whole system, across every hospital), so only an organizer can vouch
+    for one directly, with no separate approval step needed since the
+    organizer creating it IS the approval."""
+    if db.query(User).filter(User.email == body.email).first():
+        raise HTTPException(409, "An account with this email already exists.")
+    from app.security import hash_password
+    auditor = User(email=body.email, hashed_password=hash_password(body.password), role="auditor",
+                    full_name=body.full_name.strip(), status="active", email_verified=True)
+    db.add(auditor); db.commit(); db.refresh(auditor)
+    log_action(db, "AUDITOR_ACCOUNT_CREATED", user_id=user.id, target=auditor.id)
+    return {"id": auditor.id, "email": auditor.email, "role": "auditor"}
+
+@router.get("/auditors")
+def list_auditors(user=Depends(require_role("organizer")), db: Session = Depends(get_db)):
+    return to_dict_list(db.query(User).filter(User.role == "auditor").all())

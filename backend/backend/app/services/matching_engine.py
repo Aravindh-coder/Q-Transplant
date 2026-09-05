@@ -21,12 +21,22 @@ HLA_WEIGHT = 0.7
 URGENCY_WEIGHT = 0.3
 
 
-def evaluate_candidate(donor: dict, patient: dict, hospital_ready: bool = True) -> Optional[dict]:
+def evaluate_candidate(donor: dict, patient: dict, hospital_ready: bool = True, include_hla_detail: bool = False) -> Optional[dict]:
     """
     donor: {"id","blood_group","organs_available":[...], "availability_status", hla_a..hla_dq}
     patient: {"id","blood_group","required_organ","urgency","waiting_since", hla_a..hla_dq, "eligible"}
     Returns None if the candidate fails a hard gate (blood/organ), otherwise
     a full explained result.
+
+    include_hla_detail=True attaches the raw per-locus allele comparison
+    (hla_details) to the returned dict. Default is False: the result
+    surfaces the HLA *score* (a number), not the underlying donor/recipient
+    allele lists -- HLA typing is restricted clinical data, and a match
+    result is meant to answer "how compatible" for ranking purposes, not
+    hand out both parties' raw typing to whoever ran the search. Callers
+    that persist the result (and later expose it through an authorized,
+    audited detail endpoint) pass True; ad-hoc/exploratory searches leave
+    it False since nothing there is authorized-and-audited to view it later.
     """
     blood = check_blood_compatibility(donor["blood_group"], patient["blood_group"])
     if not blood["compatible"]:
@@ -53,14 +63,15 @@ def evaluate_candidate(donor: dict, patient: dict, hospital_ready: bool = True) 
     urgency_normalized = min(100, priority["score"])
     overall = round(hla["score"] * HLA_WEIGHT + urgency_normalized * URGENCY_WEIGHT, 1)
 
-    return {
+    result = {
         "donor_id": donor["id"],
         "score": overall,
         "blood_compatible": True,
         "blood_reason": blood["reason"],
         "organ_compatible": True,
         "hla_score": hla["score"],
-        "hla_details": hla["details"],
+        "hla_matched_markers": hla["matched_markers"],
+        "hla_total_markers": hla["total_markers"],
         "urgency": patient.get("urgency", "MEDIUM"),
         "priority_factors": priority["factors"],
         "explanation": (
@@ -69,19 +80,25 @@ def evaluate_candidate(donor: dict, patient: dict, hospital_ready: bool = True) 
             f"Overall ranking: {overall}/100."
         ),
     }
+    if include_hla_detail:
+        result["hla_details"] = hla["details"]  # raw per-locus alleles -- only when explicitly requested by a caller that will gate access to it
+    return result
 
 
 def run_match(donors: list[dict], patient: dict, hospital_ready: bool = True,
-              ai_explain: Optional[Callable[[dict], str]] = None, top_n: int = 5) -> dict:
+              ai_explain: Optional[Callable[[dict], str]] = None, top_n: int = 5,
+              include_hla_detail: bool = False) -> dict:
     """
     Runs the full pipeline over a candidate donor pool for one patient and
     returns the ranked top_n. Pass `ai_explain` (a function taking the result
     dict and returning a string) to attach an AI-generated natural-language
     summary on top of the deterministic explanation — never in place of it.
+    include_hla_detail: see evaluate_candidate() -- only pass True from a
+    caller that persists the result and will gate later access to it.
     """
     results = []
     for donor in donors:
-        r = evaluate_candidate(donor, patient, hospital_ready)
+        r = evaluate_candidate(donor, patient, hospital_ready, include_hla_detail=include_hla_detail)
         if r:
             results.append(r)
 
