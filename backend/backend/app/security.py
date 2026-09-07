@@ -67,3 +67,22 @@ def rate_limit(key_prefix: str, limit: int, window_minutes: int):
         hits.append(now)
         _hits[key] = hits
     return dep
+
+def rate_limit_by_user(key_prefix: str, limit: int, window_minutes: int):
+    """Same idea as rate_limit, but keyed by authenticated account rather
+    than source IP. IP-based limiting is the wrong tool for an
+    authenticated, multi-tenant endpoint: many legitimate accounts can
+    share one IP (a hospital's network, NAT, a shared clinic terminal),
+    and a malicious single account can rotate IPs freely. This only
+    applies where the request is already authenticated."""
+    def dep(user: User = Depends(get_current_user)):
+        key = f"{key_prefix}:{user.id}"
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(minutes=window_minutes)
+        hits = [h for h in _hits.get(key, []) if h > start]
+        if len(hits) >= limit:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many uploads — try again later.")
+        hits.append(now)
+        _hits[key] = hits
+        return user
+    return dep

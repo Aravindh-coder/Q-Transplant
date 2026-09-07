@@ -42,6 +42,7 @@ class Settings:
     ALLOWED_ORIGINS=os.environ.get("ALLOWED_ORIGINS","http://localhost:5173").split(",")
     LOGIN_RATE_LIMIT=int(os.environ.get("LOGIN_RATE_LIMIT",10))
     OTP_RATE_LIMIT=int(os.environ.get("OTP_RATE_LIMIT",5))
+    UPLOAD_RATE_LIMIT=int(os.environ.get("UPLOAD_RATE_LIMIT",20))
     RATE_LIMIT_WINDOW_MINUTES=int(os.environ.get("RATE_LIMIT_WINDOW_MINUTES",15))
     MIN_PASSWORD_LENGTH=int(os.environ.get("MIN_PASSWORD_LENGTH",8))
 settings=Settings()

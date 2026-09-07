@@ -19,6 +19,8 @@ def authenticate_device(device_id: str, token: str, db: Session):
 def provision_device(hospital_id: str, firmware_version: str = "1.0.0", user: User = Depends(require_role("organizer", "hospital")), db: Session = Depends(get_db)):
     hospital = db.query(HospitalProfile).filter(HospitalProfile.id == hospital_id).first()
     if not hospital: raise HTTPException(404, "Hospital not found.")
+    if user.role == "hospital" and hospital.user_id != user.id:
+        raise HTTPException(403, "You can only provision devices for your own hospital.")
     raw_token = secrets.token_urlsafe(24)
     device = Device(hospital_id=hospital_id, device_token_hash=hash_password(raw_token), firmware_version=firmware_version, connection_status="offline")
     db.add(device); db.commit(); db.refresh(device)

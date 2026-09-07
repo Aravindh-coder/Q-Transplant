@@ -13,9 +13,13 @@
     - WebSockets by Markus Sattler (arduinoWebSockets)
     - ArduinoJson
 
-  This connects to the backend_emergency_ws.py WebSocket endpoint with this
-  device's hospital_id and a device token — never ship a build with the token
-  hardcoded in a public repo; use a build-time secret or NVS storage instead.
+  SECRETS: this file must never contain a real WiFi password or device
+  token. Copy config_secrets.example.h to config_secrets.h (gitignored),
+  fill in your real values there, and this file includes it below. If
+  you don't create config_secrets.h, the build still compiles using the
+  safe placeholder defaults declared here (device just won't connect to
+  anything real). Get a real device token from an authorized account via
+  POST /api/v1/devices/provision — never invent one.
 */
 
 #include <WiFi.h>
@@ -26,14 +30,26 @@
 #include <Adafruit_SSD1306.h>
 
 // ---------- CONFIG ----------
-const char* WIFI_SSID   = "Aravindh_Hotspot";
-const char* WIFI_PASS   = "Qtransplant123";
+// Defaults are placeholders on purpose — never commit real credentials here.
+// Override them in config_secrets.h (see config_secrets.example.h), which
+// is gitignored and loaded below if present.
+#ifndef WIFI_SSID
+#define WIFI_SSID   "your-wifi-ssid"
+#endif
+#ifndef WIFI_PASS
+#define WIFI_PASS   "your-wifi-password"
+#endif
+#ifndef DEVICE_TOKEN
+#define DEVICE_TOKEN  "your-device-token-from-provision-endpoint"
+#endif
+#if __has_include("config_secrets.h")
+#include "config_secrets.h"
+#endif
 const char* WS_HOST     = "your-backend-host.example.com";
 const uint16_t WS_PORT  = 443;
 const char* WS_PATH     = "/api/v1/emergency/ws";
 const char* HOSPITAL_ID = "h1";
 const char* HOSPITAL_NAME = "Apollo Central";
-const char* DEVICE_TOKEN  = "esp32-device-secret-h1"; // matches backend DEVICE_TOKENS
 
 #define OLED_WIDTH 128
 #define OLED_HEIGHT 64

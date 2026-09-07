@@ -29,6 +29,25 @@ def _donor_to_dict(d):
 def _patient_to_dict(p):
     return {"id":p.id,"blood_group":p.blood_group,"required_organ":p.required_organ,"urgency":p.urgency,"waiting_since":p.waiting_since,"eligible":True,"hla_a":p.hla_a,"hla_b":p.hla_b,"hla_c":p.hla_c,"hla_dr":p.hla_dr,"hla_dq":p.hla_dq}
 
+def _attach_associated_hospitals(matches: list[dict], donors: list, db: Session) -> None:
+    """Attaches the registering hospital's contact info to each match result
+    in place of any donor identity -- the requesting hospital coordinates
+    with that hospital, never with the donor directly. A donor with no
+    hospital_id (self-registered, not sourced through a hospital) gets
+    associated_hospital: None; nothing about the donor's own identity is
+    ever added here."""
+    hospital_by_donor = {d.id: d.hospital_id for d in donors}
+    hospital_ids = {hid for hid in hospital_by_donor.values() if hid}
+    hospitals = {h.id: h for h in db.query(HospitalProfile).filter(HospitalProfile.id.in_(hospital_ids)).all()} if hospital_ids else {}
+    for m in matches:
+        hid = hospital_by_donor.get(m.get("donor_id"))
+        h = hospitals.get(hid)
+        m["associated_hospital"] = ({
+            "hospital_id": h.id, "hospital_name": h.hospital_name,
+            "phone": h.phone, "address": h.address, "location": h.location,
+            "authorized_contact": h.authorized_contact,
+        } if h else None)
+
 
 class RecipientSearchIn(BaseModel):
     blood_group: str
@@ -55,13 +74,14 @@ def search_by_criteria(body: RecipientSearchIn, user: User = Depends(require_rol
         "urgency": body.urgency.upper(), "waiting_since": None, "eligible": True,
         "hla_a": body.hla_a, "hla_b": body.hla_b, "hla_c": body.hla_c, "hla_dr": body.hla_dr, "hla_dq": body.hla_dq,
     }
-    donors = db.query(DonorProfile).filter(DonorProfile.availability_status == "active", DonorProfile.donation_status == "ACTIVE").all()
+    donors = db.query(DonorProfile).filter(DonorProfile.availability_status == "active", DonorProfile.donation_status == "ACTIVE", DonorProfile.verification_status == "verified").all()
     donor_dicts = [_donor_to_dict(d) for d in donors]
 
     result = run_match(donor_dicts, ad_hoc_patient, top_n=len(donor_dicts) or 1)
     full_ranked = result["matches"]  # every candidate that passed blood+organ hard gates, fully scored
     result["matches"] = full_ranked[:10]
     result["matches"] = [{**m, **decision_support_payload(m)} for m in result["matches"]]
+    _attach_associated_hospitals(result["matches"], donors, db)
     for i, m in enumerate(result["matches"]):
         m["ai_assist"] = {"risk_flags": risk_flags(m), "summary": summarize_match(m)}
         if i < body.ai_review_top_n:
@@ -105,9 +125,10 @@ def run_match_for_patient(patient_id: str, user: User = Depends(require_role("do
     else:
         hospital=db.query(HospitalProfile).filter(HospitalProfile.user_id==user.id).first()
         if not hospital or hospital.id!=patient.hospital_id: raise HTTPException(403,"You are not authorized for this patient.")
-    donors=db.query(DonorProfile).filter(DonorProfile.availability_status=="active",DonorProfile.donation_status=="ACTIVE").all()
+    donors=db.query(DonorProfile).filter(DonorProfile.availability_status=="active",DonorProfile.donation_status=="ACTIVE",DonorProfile.verification_status=="verified").all()
     result=run_match([_donor_to_dict(d) for d in donors],_patient_to_dict(patient))
     result["matches"]=[{**m,**decision_support_payload(m)} for m in result["matches"]]
+    _attach_associated_hospitals(result["matches"], donors, db)
     for m in result["matches"]:
         # AI-assist layer: flags and phrasing only, never re-scores or
         # re-ranks -- the deterministic engine above has already decided.

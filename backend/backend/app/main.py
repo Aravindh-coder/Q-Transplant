@@ -2,7 +2,7 @@
 import logging
 import os
 from sqlalchemy import inspect, text
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings, BASE_DIR
@@ -18,7 +18,7 @@ PUBLIC_DIR=os.path.join(BASE_DIR,"public")
 
 def ensure_schema():
  Base.metadata.create_all(bind=engine)
- additions={"donor_profiles":[("medical_information","TEXT"),("donation_status","VARCHAR(64) DEFAULT 'ACTIVE'")],"doctor_profiles":[("professional_information","TEXT"),("photo_document_id","VARCHAR(64)"),("certificate_document_id","VARCHAR(64)"),("identity_check_result","TEXT"),("identity_check_confidence","VARCHAR(32)")],"hospital_profiles":[("location","TEXT"),("registration_number","VARCHAR(255)"),("authorized_contact","VARCHAR(255)")]}
+ additions={"donor_profiles":[("medical_information","TEXT"),("donation_status","VARCHAR(64) DEFAULT 'ACTIVE'"),("medical_document_id","VARCHAR(64)")],"doctor_profiles":[("professional_information","TEXT"),("photo_document_id","VARCHAR(64)"),("certificate_document_id","VARCHAR(64)"),("identity_check_result","TEXT"),("identity_check_confidence","VARCHAR(32)")],"hospital_profiles":[("location","TEXT"),("registration_number","VARCHAR(255)"),("authorized_contact","VARCHAR(255)")]}
  inspector=inspect(engine)
  with engine.begin() as conn:
   for table,cols in additions.items():
@@ -97,12 +97,14 @@ for router in (auth.router,users.router,donors.router,doctors.router,hospitals.r
 @app.get("/api")
 def api_status(): return {"service":"Q-Transplant API","status":"online","version":"2.2.0"}
 @app.get("/health")
-def health():
+def health(response: Response):
     try:
         with engine.connect() as conn: conn.execute(text("SELECT 1"))
         return {"status":"ok","database":"connected"}
-    except Exception as e:
-        return {"status":"ok","database":"unreachable","detail":str(e)}
+    except Exception:
+        logger.exception("Health check: database unreachable.")
+        response.status_code = 503
+        return {"status":"degraded","database":"unreachable"}
 # Mounted last so it never shadows the API routes above — this serves
 # public/index.html at "/", and public/app.html, public/donor.html, and
 # static assets by filename. Same-origin means the frontend's fetch calls

@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, Document, DoctorProfile, HospitalProfile
-from app.security import get_current_user
+from app.models import User, Document, DoctorProfile, HospitalProfile, DonorProfile
+from app.security import get_current_user, rate_limit_by_user
+from app.config import settings
 from app.services.audit import log_action
 from app.services.identity_verification import verify_identity_photos
 from app.services import object_storage
@@ -18,6 +19,7 @@ ALLOWED = {"pdf", "png", "jpg", "jpeg"}
 MAX_BYTES = 10 * 1024 * 1024
 _MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "pdf": "application/pdf"}
 # kind values the frontend can send, normalized to what gets linked where
+_DONOR_MEDICAL_KINDS = {"medical_document", "medical_report", "medical_certificate"}
 _PHOTO_KINDS = {"photo", "live_photo", "selfie"}
 _CERT_KINDS = {"certificate", "license", "license_certificate"}
 
@@ -62,7 +64,9 @@ def _run_identity_check_if_ready(db: Session, profile: DoctorProfile):
 
 
 @router.post("")
-async def upload_document(kind: str, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def upload_document(kind: str, file: UploadFile = File(...),
+                           user: User = Depends(rate_limit_by_user("document_upload", settings.UPLOAD_RATE_LIMIT, settings.RATE_LIMIT_WINDOW_MINUTES)),
+                           db: Session = Depends(get_db)):
     ext = Path(file.filename or "").suffix.lower().lstrip(".")
     if ext not in ALLOWED:
         raise HTTPException(400, "Only PDF, PNG and JPEG documents are allowed.")
@@ -91,6 +95,15 @@ async def upload_document(kind: str, file: UploadFile = File(...), user: User = 
         if profile:
             profile.license_document_id = doc.id
             db.commit()
+    elif user.role == "donor" and kind in _DONOR_MEDICAL_KINDS:
+        profile = db.query(DonorProfile).filter(DonorProfile.user_id == user.id).first()
+        if profile:
+            profile.medical_document_id = doc.id
+            if profile.verification_status == "pending":
+                profile.verification_status = "under_review"
+            db.commit()
+            notify_organizer("Q-Transplant — donor medical document ready for review",
+                              f"{user.full_name or user.email} uploaded a medical document and is awaiting verification before appearing in donor search results.")
 
     return to_dict(doc)
 

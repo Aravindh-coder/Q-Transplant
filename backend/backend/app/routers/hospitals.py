@@ -6,12 +6,24 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, HospitalProfile
-from app.security import require_role
+from app.security import require_role, get_current_user
 from app.services.search_service import paginate
 from app.services.performance import bounded_page, DEFAULT_PAGE_SIZE
 from app.utils import to_dict, to_dict_list
 
 router = APIRouter(prefix="/api/v1/hospitals", tags=["hospitals"])
+
+
+@router.get("/directory")
+def hospital_directory(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Minimal, any-authenticated-role list of verified hospitals -- exists
+    so a donor (who can't call GET /hospitals, restricted to
+    doctor/hospital/organizer) has a way to pick which hospital they're
+    registering through. Deliberately narrow: id/name/location only, none
+    of the institutional contact fields GET /hospitals exposes to
+    clinical/admin roles."""
+    hospitals = db.query(HospitalProfile).filter(HospitalProfile.verification_status.in_(["verified", "approved"])).all()
+    return [{"id": h.id, "hospital_name": h.hospital_name, "location": h.location} for h in hospitals]
 
 
 class HospitalProfileIn(BaseModel):

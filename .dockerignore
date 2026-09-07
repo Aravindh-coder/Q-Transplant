@@ -1,0 +1,12 @@
+.git
+.gitignore
+venv/
+__pycache__/
+*.pyc
+*.db
+backend/backend/.env
+config_secrets.h
+uploads/
+node_modules/
+dist/
+backend_extracted/
