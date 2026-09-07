@@ -1326,3 +1326,18 @@ def test_only_organizer_can_create_auditor_accounts(client, organizer_token):
     r = client.post("/api/v1/organizer/auditors", json={"email": unique_email("blocked"), "password": "x", "full_name": "y"},
                      headers={"Authorization": f"Bearer {doc_token}"})
     assert r.status_code == 403
+
+
+# ---------- observability redaction is substring-based, not just exact-match ----------
+
+def test_safe_event_redacts_hla_field_variants(caplog):
+    from app.services.observability import safe_event
+    import logging
+    with caplog.at_level(logging.INFO, logger="qtransplant"):
+        safe_event("test_event", user_id="u1", hla_a="A1,A2", hla_dr="DR1", access_token="secret-token", email="ok@example.com")
+    assert len(caplog.records) >= 1
+    msg = caplog.records[-1].getMessage()
+    assert "A1,A2" not in msg and "hla_a" not in msg
+    assert "hla_dr" not in msg
+    assert "secret-token" not in msg and "access_token" not in msg
+    assert "u1" in msg and "ok@example.com" in msg
