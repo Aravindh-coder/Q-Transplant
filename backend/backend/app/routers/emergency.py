@@ -10,6 +10,7 @@ from app.models import User, HospitalProfile, EmergencyRequest, Device, DoctorPr
 from app.security import require_role, verify_password
 from app.services.audit import log_action
 from app.services.notifications import notify_role, notify_organizer
+from app.services.emergency_state import transition
 
 router = APIRouter(prefix="/api/v1/emergency", tags=["emergency"])
 CONNECTIONS: List[WebSocket] = []
@@ -141,6 +142,7 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
         if device is None:
             await websocket.close(code=4401); return
         device.last_seen = now_utc(); device.connection_status = "online"; db.commit()
+        device_id = device.id  # captured before the session below closes -- device becomes a detached instance after that, and touching its attributes later can raise DetachedInstanceError
     finally:
         db.close()
 
@@ -157,7 +159,7 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
                 await websocket.send_text(json.dumps({"type": "error", "code": "DEVICE_HOSPITAL_MISMATCH"})); continue
             db = SessionLocal()
             try:
-                device_db = db.query(Device).filter(Device.id == device.id, Device.hospital_id == hospital_id).first()
+                device_db = db.query(Device).filter(Device.id == device_id, Device.hospital_id == hospital_id).first()
                 if not device_db:
                     await websocket.close(code=4403); return
                 device_db.last_seen = now_utc(); device_db.connection_status = "online"
@@ -172,7 +174,7 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
                     db.add(req); db.flush()
                     notify_role(db, "hospital", "Emergency request", "Emergency requirement: " + requirement, "urgent", True)
                     notify_role(db, "doctor", "Emergency request", "Emergency requirement: " + requirement, "urgent", True)
-                    log_action(db, "EMERGENCY_CREATED", target=req.id, meta={"source": "esp32", "device_id": device.id})
+                    log_action(db, "EMERGENCY_CREATED", target=req.id, meta={"source": "esp32", "device_id": device_id})
                     db.commit(); notify_organizer("Q-Transplant — emergency request", "Hospital emergency: " + requirement)
                 elif kind == "requirement_update":
                     req = (db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id == hid,
@@ -183,15 +185,25 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
                     req = (db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id == target,
                             EmergencyRequest.status.notin_(list(TERMINAL))).order_by(EmergencyRequest.created_at.desc()).first()) if target else None
                     if req:
-                        req.responding_hospital_id = hid; req.status = "ACKNOWLEDGED"
-                        log_action(db, "EMERGENCY_ACKNOWLEDGED", target=req.id, meta={"responding_hospital": hid, "source": "esp32"})
-                        db.commit(); notify_organizer("Q-Transplant — emergency response", "A hospital has responded to an emergency request.")
+                        try:
+                            new_status = transition(req.status, "ACKNOWLEDGED")
+                        except ValueError:
+                            new_status = None
+                        if new_status:
+                            req.responding_hospital_id = hid; req.status = new_status
+                            log_action(db, "EMERGENCY_ACKNOWLEDGED", target=req.id, meta={"responding_hospital": hid, "source": "esp32"})
+                            db.commit(); notify_organizer("Q-Transplant — emergency response", "A hospital has responded to an emergency request.")
                 elif kind == "acknowledge":
                     req = (db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id == hid,
                             EmergencyRequest.status.notin_(list(TERMINAL))).order_by(EmergencyRequest.created_at.desc()).first())
-                    if req and req.status in {"CREATED", "NOTIFIED"}:
-                        req.status = "ACKNOWLEDGED"
-                        log_action(db, "EMERGENCY_ACKNOWLEDGED", target=req.id, meta={"device_id": device.id, "source": "esp32"}); db.commit()
+                    if req:
+                        try:
+                            new_status = transition(req.status, "ACKNOWLEDGED")
+                        except ValueError:
+                            new_status = None
+                        if new_status:
+                            req.status = new_status
+                            log_action(db, "EMERGENCY_ACKNOWLEDGED", target=req.id, meta={"device_id": device_id, "source": "esp32"}); db.commit()
                 elif kind == "processing":
                     req = (db.query(EmergencyRequest).filter(EmergencyRequest.hospital_id == hid,
                             EmergencyRequest.status.notin_(list(TERMINAL))).order_by(EmergencyRequest.created_at.desc()).first())
@@ -201,13 +213,13 @@ async def emergency_ws(websocket: WebSocket, hospital_id: str = "", device_token
                             EmergencyRequest.status == "PROCESSING").order_by(EmergencyRequest.created_at.desc()).first())
                     if req:
                         req.status = "RESOLVED"; req.resolved_at = now_utc()
-                        log_action(db, "EMERGENCY_RESOLVED", target=req.id, meta={"device_id": device.id, "source": "esp32"}); db.commit()
+                        log_action(db, "EMERGENCY_RESOLVED", target=req.id, meta={"device_id": device_id, "source": "esp32"}); db.commit()
             finally: db.close()
             await broadcast_state()
     except WebSocketDisconnect:
         if websocket in CONNECTIONS: CONNECTIONS.remove(websocket)
         db = SessionLocal()
         try:
-            d = db.query(Device).filter(Device.id == device.id).first()
+            d = db.query(Device).filter(Device.id == device_id).first()
             if d: d.connection_status = "offline"; d.last_seen = now_utc(); db.commit()
         finally: db.close()

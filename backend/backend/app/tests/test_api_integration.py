@@ -1341,3 +1341,53 @@ def test_safe_event_redacts_hla_field_variants(caplog):
     assert "hla_dr" not in msg
     assert "secret-token" not in msg and "access_token" not in msg
     assert "u1" in msg and "ok@example.com" in msg
+
+
+# ---------- emergency state machine: ESP32 protocol now validated, not just hardcoded ----------
+
+def test_emergency_cannot_skip_backward_via_donor_found(client, organizer_token):
+    """donor_found used to set status=ACKNOWLEDGED unconditionally, with no
+    check at all -- meaning it could invalidly jump a request backward
+    from PROCESSING to ACKNOWLEDGED. Now routed through the real state
+    machine, which rejects that."""
+    doc_token, patient_id = _hospital_with_patient(client, organizer_token, "Emergency State Patient")
+    # Get this doctor's hospital id to raise a real emergency for it.
+    hospitals = client.get("/api/v1/hospitals", params={"page_size": 100}, headers={"Authorization": f"Bearer {organizer_token}"}).json()
+    profile = client.get("/api/v1/doctors/me", headers={"Authorization": f"Bearer {doc_token}"}).json()
+    hospital_id = profile["hospital_id"]
+
+    create = client.post("/api/v1/emergency/create", json={"requirement": "State machine test"}, headers={"Authorization": f"Bearer {doc_token}"})
+    assert create.status_code == 200
+
+    device = client.post(f"/api/v1/devices/provision?hospital_id={hospital_id}", headers={"Authorization": f"Bearer {organizer_token}"})
+    assert device.status_code == 200
+    device_token = device.json()["device_token"]
+
+    with client.websocket_connect(f"/api/v1/emergency/ws?hospital_id={hospital_id}&device_token={device_token}") as ws:
+        ws.receive_json()  # initial state snapshot
+        # Walk it forward to PROCESSING first (the valid path).
+        ws.send_json({"type": "acknowledge", "hospital_id": hospital_id})
+        ws.receive_json()
+        ws.send_json({"type": "processing", "hospital_id": hospital_id})
+        ws.receive_json()
+
+        from app.database import SessionLocal
+        from app.models import EmergencyRequest
+        db = SessionLocal()
+        try:
+            req = db.query(EmergencyRequest).filter_by(hospital_id=hospital_id).order_by(EmergencyRequest.created_at.desc()).first()
+            assert req.status == "PROCESSING"
+        finally:
+            db.close()
+
+        # donor_found targeting this same hospital should NOT be able to
+        # drag it back to ACKNOWLEDGED now that it's already PROCESSING.
+        ws.send_json({"type": "donor_found", "hospital_id": hospital_id, "target_hospital_id": hospital_id})
+        ws.receive_json()
+
+        db = SessionLocal()
+        try:
+            req = db.query(EmergencyRequest).filter_by(hospital_id=hospital_id).order_by(EmergencyRequest.created_at.desc()).first()
+            assert req.status == "PROCESSING", "invalid backward transition was allowed through"
+        finally:
+            db.close()
