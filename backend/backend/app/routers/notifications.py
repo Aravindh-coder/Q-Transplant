@@ -28,12 +28,16 @@ async def notifications_ws(websocket: WebSocket, token: str = ""):
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.id == payload.get("sub")).first()
+        if user:
+            user_id, user_role, user_status = user.id, user.role, user.status
+        else:
+            user_id = user_role = user_status = None
     finally:
         db.close()
-    if not user or user.status in ("suspended", "inactive"):
+    if not user_id or user_status in ("suspended", "inactive"):
         await websocket.close(code=4401)
         return
-    await realtime.connect(websocket, user_id=user.id, role=user.role)
+    await realtime.connect(websocket, user_id=user_id, role=user_role)
     try:
         while True:
             await websocket.receive_text()  # keepalive pings; content ignored
