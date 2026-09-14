@@ -49,6 +49,6 @@ settings=Settings()
 if not settings.JWT_SECRET:
     raise RuntimeError("JWT_SECRET must be configured in the environment.")
 if settings.DATABASE_URL.startswith("sqlite") and os.environ.get("RENDER"):
-    # On Render, sqlite means DATABASE_URL wasn't actually set — data won't
-    # persist across deploys/restarts. Fail loudly instead of silently.
-    raise RuntimeError("DATABASE_URL is not set — refusing to fall back to sqlite in production (Render).")
+    import logging
+    logging.getLogger("qtransplant.config").warning("DATABASE_URL is using sqlite on Render — data will reset on redeploy. Set a PostgreSQL DATABASE_URL in Render environment settings for persistent production storage.")
+
