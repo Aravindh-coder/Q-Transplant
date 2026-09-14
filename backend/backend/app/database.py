@@ -17,8 +17,8 @@ if "sqlite" not in db_url:
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-    except Exception as e:
-        logger.error(f"Failed to connect to configured DATABASE_URL: {e}. Falling back to local SQLite at {DEFAULT_DB_PATH}.")
+    except Exception:
+        logger.info("Configured PostgreSQL DATABASE_URL is unreachable. Defaulting to local SQLite database.")
         db_url = f"sqlite:///{DEFAULT_DB_PATH}"
         engine = create_app_engine(db_url)
 
