@@ -1,12 +1,29 @@
-from sqlalchemy import create_engine
+import logging
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
-from app.config import settings
+from app.config import settings, DEFAULT_DB_PATH
 
-connect_args = {"check_same_thread": False, "timeout": 30} if "sqlite" in settings.DATABASE_URL else {}
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args)
+logger = logging.getLogger("qtransplant.database")
+
+def create_app_engine(url: str):
+    connect_args = {"check_same_thread": False, "timeout": 30} if "sqlite" in url else {}
+    return create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+
+db_url = settings.DATABASE_URL
+engine = create_app_engine(db_url)
+
+# Fallback to SQLite if PostgreSQL host is dead/unreachable
+if "sqlite" not in db_url:
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error(f"Failed to connect to configured DATABASE_URL: {e}. Falling back to local SQLite at {DEFAULT_DB_PATH}.")
+        db_url = f"sqlite:///{DEFAULT_DB_PATH}"
+        engine = create_app_engine(db_url)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
-
 
 def get_db():
     db = SessionLocal()
